@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getServerSession } from "@/lib/auth/session";
+import { getServerSession, sessionCookieOptions } from "@/lib/auth/session";
+import { SESSION_COOKIE } from "@/lib/auth/jwt";
 import { AuditService } from "@/lib/audit/audit-service";
 import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 
@@ -20,6 +21,6 @@ export async function POST(): Promise<NextResponse> {
     });
   }
 
-  cookies().delete("saas_session");
+  cookies().delete(SESSION_COOKIE);
   return NextResponse.json({ loggedOut: true });
 }

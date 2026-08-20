@@ -3,6 +3,7 @@ import { withApiRoute } from "@/lib/http/route-wrapper";
 import { ok, fail } from "@/lib/http/errors";
 import { prismaUnscoped } from "@/lib/prisma/client";
 import { SESSION_COOKIE, signSessionToken } from "@/lib/auth/jwt";
+import { sessionCookieOptions } from "@/lib/auth/session";
 import { AuditService } from "@/lib/audit/audit-service";
 import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 
@@ -61,9 +62,10 @@ export const POST = withApiRoute(ACTIONS.BILLING_ADMIN, async (ctx, _req, params
   });
 
   const response = ok({ impersonating: true, redirect: "/dashboard" });
+  const s = sessionCookieOptions();
   response.headers.set(
     "Set-Cookie",
-    `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/`,
+    `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=${s.sameSite}; Path=${s.path}${s.secure ? "; Secure" : ""}`,
   );
   return response;
 });

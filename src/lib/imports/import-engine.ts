@@ -6,6 +6,7 @@ import { parseCsv, parseJson, parseXml, type ParseOutput } from "@/lib/imports/p
 import type { NormalizedPropertyRow } from "@/lib/imports/parsers";
 import { withTenantContext } from "@/lib/tenant/context";
 import { buildSearchText, ensureUniqueSlug, slugBaseFrom } from "@/lib/properties/seo";
+import { NonRetryableError } from "@/workers/helpers";
 
 /**
  * ImportEngine — processes one ImportBatch.
@@ -115,7 +116,7 @@ export class ImportEngine {
   }> {
     const batch = await prisma.importBatch.findUnique({ where: { id: batchId } });
     if (!batch) {
-      throw new Error(`ImportBatch ${batchId} not found.`);
+      throw new NonRetryableError(`ImportBatch ${batchId} not found.`);
     }
     const tenantId = batch.tenantId;
 

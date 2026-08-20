@@ -26,6 +26,11 @@ autenticação/autorização e o contrato de webhooks (saída e entrada).
   `Cookie: saas_session=<jwt>`.
 - O middleware edge re-verifica o JWT e reconcilia o subdomínio do tenant com
   o `tenantSlug` da sessão (mismatch → `403 TENANT_MISMATCH`).
+- CSRF: solicitações de escrita (`POST/PUT/PATCH/DELETE`) em rotas
+  autenticadas são rejeitadas quando o header `Origin` não bate com o `Host`
+  do servidor → `403 CSRF_REJECTED`. Requisições sem `Origin` (curl, máquina a
+  máquina) não são afetadas. Além do `SameSite=Lax`, é o segundo fator de
+  defesa contra cross-site request forgery.
 
 ### 1.3 Autorização (RBAC)
 

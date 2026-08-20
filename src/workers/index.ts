@@ -9,6 +9,7 @@ import { createPropertyImportWorker } from "@/workers/property-import.worker";
 import { createBillingSyncWorker } from "@/workers/billing.worker";
 import { createEmailWorker } from "@/workers/email.worker";
 import { createDlqWorker } from "@/workers/dlq.worker";
+import { startDeliveryReconciler } from "@/lib/integrations/delivery-reconciler";
 
 /**
  * Worker entrypoint — start every queue consumer in one process.
@@ -40,6 +41,10 @@ async function main(): Promise<void> {
     createDlqWorker(QueueName.EMAIL_SEND),
   ];
 
+  // Zero-loss recovery: re-enqueue webhook deliveries that were persisted
+  // PENDING but never got a queue job (Redis outage during enqueue).
+  const deliveryReconciler = startDeliveryReconciler();
+
   console.info(`[workers] started ${workers.length} consumers (pid ${process.pid})`);
 
   let shuttingDown = false;
@@ -47,6 +52,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     console.info(`[workers] ${signal} received — draining…`);
+    clearInterval(deliveryReconciler);
     await Promise.all(workers.map((w) => w.close()));
     console.info("[workers] stopped cleanly.");
     process.exit(0);

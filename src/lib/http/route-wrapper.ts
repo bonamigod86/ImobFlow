@@ -40,6 +40,27 @@ interface HandlerArgs {
   params?: RouteParams | Promise<RouteParams>;
 }
 
+/**
+ * CSRF defense-in-depth on top of SameSite=Lax cookies: browsers attach an
+ * `Origin` header to every cross-site state-changing request. If present and
+ * it does not match the server's own Host, reject before the handler runs.
+ * Requests without `Origin` (curl, server-to-server, internal) are untouched.
+ */
+const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function assertSafeOrigin(req: NextRequest): NextResponse | null {
+  if (!UNSAFE_METHODS.has(req.method)) return null;
+  const origin = req.headers.get("origin");
+  const host = req.headers.get("host");
+  if (!origin || !host) return null;
+  try {
+    if (new URL(origin).host === host) return null;
+  } catch {
+    return null;
+  }
+  return fail(403, "CSRF_REJECTED", "Cross-origin request blocked.");
+}
+
 export function withApiRoute(
   action: Action,
   handler: (
@@ -51,6 +72,11 @@ export function withApiRoute(
   return async (req: NextRequest, route: HandlerArgs = {}): Promise<NextResponse> => {
     try {
       const session = await getSessionFromRequest(req);
+
+      // 0 — CSRF: reject cross-origin state-changing requests.
+      const csrf = assertSafeOrigin(req);
+      if (csrf) return csrf;
+
       if (!session) {
         return fail(401, "UNAUTHORIZED", "Authentication required.");
       }

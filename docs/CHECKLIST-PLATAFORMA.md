@@ -439,6 +439,66 @@ do entregável (fornecidas só ao profissional selecionado).
 
 ---
 
+## Item 11 — Arquitetura desacoplada (requisito crítico)
+
+Status: **100% implementado**. Sistemas integrados permanecem tecnicamente
+independentes (sem banco compartilhado, sem dependência direta entre bancos,
+sem código misturado, substituíveis por configuração); a solução provê
+autenticação segura, identificação de tenant, segregação de dados,
+idempotência, retry e filas. Auditoria dedicada realizada (3 agentes parciais:
+segregação multi-tenant, desacoplamento da camada de integração, mecanismos).
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 11.1 | Sem banco compartilhado entre sistemas | OK | Única dependência de DB = `@prisma/client` (DB da plataforma em `postgres://`); **nenhum** cliente SQL para banco externo (sem `mysql2/pg/mssql/typeorm` no repo); integrações trafegam 100% por HTTP |
+| 11.2 | Sem dependência direta entre bancos | OK | Nenhum código conecta no banco de sistema externo; o único caminho para terceiros é `fetch` outbound (webhook) + SMTP/S3/gateway |
+| 11.3 | Código não misturado | OK | Adapters `strategies.ts` são funções puras (único import é type `WebhookStrategy`); o bridge DB→envelope vive em `envelope.ts`; entrega HTTP isolada em `delivery.ts` |
+| 11.4 | Substituibilidade futura | OK | Destino 100% configurável: `WebhookEndpoint` (`baseUrl`, `method`, `hmacSecret`, `timeoutMs`, `strategy`) via `CRUD /api/webhook-endpoints` — trocar sistema = 1 chamada de API, zero mudança de código |
+| 11.5 | Autenticação segura | OK | Sessão JWT HS256 em cookie `HttpOnly` (`Secure` em produção, `SameSite=Lax`), bcryptjs cost 12, RBAC por ação; **CSRF**: escrita em rotas autenticadas exige `Origin` = `Host` (senão `403 CSRF_REJECTED`), além do `SameSite=Lax` |
+| 11.6 | Identificação de tenant | OK | `tenantId` vem das claims verificadas do JWT (`ctx.tenantId`); tenant é reassertado `ACTIVE` a cada requisição; `AsyncLocalStorage` carrega o contexto para o Prisma auto-escopar toda query |
+| 11.7 | Segregação de dados (fail-closed) | OK | Extensão Prisma injeta `tenantId` em create/read/update/delete de modelos STRICT e lança `TenantContextRequiredError` se não houver contexto — leaks impossíveis por esquecimento; auditoria por agente AI: **0 vazamentos HIGH** nas rotas/lib/workers |
+| 11.8 | Idempotência | OK | `WebhookDelivery.idempotencyKey = sha256(tenant:lead:endpoint)` @unique + `@@unique([leadId, endpointId])`; jobIds estáveis no BullMQ (`webhook:<endpoint>:lead.created:<lead>`); replay DLQ não duplica (`DELIVERED` short-circuit) |
+| 11.9 | Retry | OK | BullMQ `attempts: 5` + backoff exponencial base 2s; classificação `429/5xx/network/timeout` → retryable, `4xx` → `NonRetryableError` + DLQ `DEAD_LETTERED`; tentativas duráveis (`WebhookDeliveryAttempt` escrita antes do HTTP) |
+| 11.10 | Filas quando necessárias | OK | 7 filas BullMQ (routing, webhook, media, import, billing, email + DLQs); **fail-open com reconciler**: se o Redis cai no enqueue, o lead é salvo e o reconciler re-enfileira entregas `PENDING` órfãs (zero-loss) |
+| 11.11 | Sem acoplamento que impeça substituição | OK | Troca entre `CUSTOM_JSON/CRM_DEFAULT/FINANCE_DEFAULT` por mudança de `strategy`; contrato novo exige novo adapter puro (único ponto de mudança, isolado) |
+
+### Testes/smoke realizados
+
+1. TSC limpo, ESLint limpo, vitest **210/210** após as mudanças.
+2. **CSRF**: `POST /api/webhook-endpoints` com `Origin: http://localhost:3000`
+   → progrediu até validação (`400 VALIDATION_ERROR`); com
+   `Origin: http://evil.example` → **`403 CSRF_REJECTED`**; sem `Origin`
+   (curl/CLI) → fluxo normal preservado.
+3. Auditoria automatizada de segregação: 0 achados **HIGH**; 3 notas LOW
+   informativas (guard pós-leitura em `webhook-deliveries/[id]`, ownership
+   pre-checks em `webhook-endpoints/[id]` e `routing-rules/[id]`) — sem
+   exposição de dados.
+4. Envelope financeiro do §3.4 (origin/interest_type/property) já validado no
+   item 10 com entrega fim-a-fim via `/api/public/financial-leads`.
+
+---
+
+## Correções aplicadas após a auditoria (Item 11)
+
+1. **Entregas `PENDING` órfãs sem reconciler (furo de zero-loss)** — quando o
+   Redis cai no enqueue, `.catch(() => null)` registrava a entrega `PENDING`
+   sem job e nada a re-enfileirava. Novo `src/lib/integrations/delivery-reconciler.ts`:
+   a cada 60s, re-enfileira entregas `PENDING` com `attemptsCount=0`,
+   `nextAttemptAt=NULL` e mais de 90s — idempotente no jobId estável. Iniciado
+   no entrypoint de workers (`src/workers/index.ts`), nunca no servidor Next.
+2. **Sem proteção CSRF** — rotas autenticadas aceitavam escrita cross-site
+   (apenas `SameSite=Lax`). Novo `assertSafeOrigin` em `withApiRoute`
+   (`src/lib/http/route-wrapper.ts`): escrita com `Origin` ≠ `Host` →
+   `403 CSRF_REJECTED`; sem `Origin` não é afetado (curl/máquina a máquina).
+3. **Inconsistência de cookies** — logout apagava `"saas_session"` hardcoded
+   (agora `SESSION_COOKIE`) e impersonate não aplicava `Secure` em produção
+   (agora usa `sessionCookieOptions()`).
+4. **Erro permanente queimando retry budget** — `ImportBatch` inexistente
+   lançava `Error` retryable (5 tentativas inúteis antes do DLQ); agora
+   `NonRetryableError` (`src/lib/imports/import-engine.ts`).
+
+---
+
 ## Correções aplicadas após a auditoria (Item 5)
 
 1. **Duplicar conflitava no `externalCode`** — `duplicateProperty` copiava o
