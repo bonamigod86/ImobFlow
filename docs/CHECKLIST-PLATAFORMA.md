@@ -347,6 +347,49 @@ autorizado** — sem motor próprio de aprovação financeira.
 
 ---
 
+## Item 9 — Roteamento de leads
+
+Status: **100% implementado**. Camada configurável de roteamento com destino
+correto e isolamento absoluto entre clientes.
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 9.1 | Camada configurável de roteamento | OK | `RoutingRule` + `GET/POST/PATCH/DELETE /api/routing-rules` (regras por prioridade e filtros: cidade/UF, renda, valor, prazo) |
+| 9.2 | Leads imobiliários → anunciante responsável | OK | Captura anexa ao imóvel/tenant do anúncio; worker `lead-routing-queue` atribui ao OWNER do anúncio (`payload.routing.tier`) + e-mail `new_lead_alert`; despacho para endpoints `REAL_ESTATE` do tenant/plataforma |
+| 9.3 | Produtos/serviços adicionais → destinos externos configurados | OK | Leads `FINANCIAL` (financiamento/simulação/alternativas) roteados por regras para endpoints `FINANCIAL` (parceiros) via webhook assinado |
+| 9.4 | Identificação correta do destino | OK | `selectRoutingEndpoint` puro (tenant → platform, prioridade); entrega registra `matchedRuleId` + `endpointId`; endpoint validado como ativo e do escopo certo |
+| 9.5 | Isolamento absoluto entre clientes | OK | Regras consultadas já no escopo `tenantId = NULL | <tenant do lead>`; tenant A nunca vê/usa regra ou endpoint do tenant B; `POST` rejeita anexar endpoint de outro assinante |
+
+### Testes manuais realizados (via HTTP)
+
+1. `GET /api/routing-rules` (acme) → somente regras da plataforma + próprias.
+2. `POST /api/routing-rules` (regra do tenant, cidade Campinas) → criada com o
+   `tenantId` do assinante; `GET` seguinte a exibe.
+3. `POST` com endpoint `REAL_ESTATE` numa regra → **400 `INVALID_ENDPOINT`**
+   (regras financeiras exigem endpoint `FINANCIAL` ativo).
+4. Lead financeiro **sem** cidade (herda São Paulo do imóvel) → regra do tenant
+   de Campinas **não** casa; cai na regra de plataforma correta (SP).
+5. Lead financeiro com `city=Campinas` → **regra do tenant vencera a de
+   plataforma** (`matchedRuleId` = regra Acme-Campinas), destino `CredFácil`.
+6. `DELETE /api/routing-rules/[id]` → regra desativada.
+7. Isolamento: regra de outro tenant nunca é considerada (teste unitário).
+
+---
+
+## Correções aplicadas após a auditoria (Item 9)
+
+1. **Consulta de regras carregava todos os tenants** — `resolveFinancialEndpoint`
+   buscava toda a tabela e filtrava em memória. Agora a query filtra no banco
+   (`tenantId = NULL | <tenant do lead>`) — o lead de um cliente nunca carrega
+   nem avalia regra de outro ("isolamento absoluto" por construção).
+2. **Teste de isolamento ausente** — adicionado caso em que a regra de outro
+   tenant (mesmo com prioridade 1) é ignorada para o lead, com fallback para
+   regra própria/plataforma e correta destinação para o dono da regra.
+3. **Checklist sem rastreabilidade** — seção Item 9 criada em
+   `CHECKLIST-PLATAFORMA.md` (requisitos 9.1–9.5, testes manuais).
+
+---
+
 ## Correções aplicadas após a auditoria (Item 5)
 
 1. **Duplicar conflitava no `externalCode`** — `duplicateProperty` copiava o
@@ -456,3 +499,5 @@ autorizado** — sem motor próprio de aprovação financeira.
 - Item 8 (aquisição): captura financeira com os 11 campos, qualificação por
   regras e encaminhamento ao sistema externo autorizado (`FINANCE_DEFAULT`)
   validados via HTTP
+- Item 9 (roteamento): camada configurável com preferência tenant→plataforma,
+  destino correto e isolamento absoluto entre clientes validados via HTTP

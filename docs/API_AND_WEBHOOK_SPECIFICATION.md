@@ -260,6 +260,15 @@ APT-101,Apto Centro,São Paulo,SP,RENT,3900,85,2
 | GET | `/api/webhook-deliveries` | `integrations:manage` | entregas (filtro por status) |
 | GET | `/api/webhook-deliveries/{id}` | `integrations:manage` | detalhe + tentativas |
 
+**Roteamento (item 9):** leads imobiliários vão ao anunciante responsável do
+imóvel (atribuição ao OWNER do anúncio + despacho a endpoints `REAL_ESTATE` do
+próprio tenant/plataforma). Leads de produtos/serviços adicionais (`FINANCIAL`)
+são roteados por regras configuráveis para destinos externos. **Isolamento
+absoluto**: a consulta de regras é feita já no escopo `tenantId = NULL | <tenant
+do lead>` e o `POST /api/routing-rules` rejeita anexar endpoint de outro
+assinante — o destino é sempre identificado como pertencente ao contexto do
+lead.
+
 ### 2.8 Faturamento (tenant)
 
 | Método | Rota | Ação | Descrição |

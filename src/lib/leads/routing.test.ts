@@ -93,4 +93,22 @@ describe("selectRoutingEndpoint", () => {
     const only = cand({ id: "only", city: "Curitiba" });
     expect(selectRoutingEndpoint([only], "t1", { city: "São Paulo" })).toBeNull();
   });
+
+  it("never selects a rule owned by another tenant (isolation)", () => {
+    const foreign = cand({ id: "r-foreign", tenantId: "t2", priority: 1, endpointId: "ep-foreign" });
+    const own = cand({ id: "r-own", tenantId: "t1", priority: 50, endpointId: "ep-own", city: "São Paulo" });
+    const platform = cand({ id: "r-platform", priority: 200, endpointId: "ep-platform" });
+
+    // Leads of tenant t1 ignore t2's rules entirely — even when they win on
+    // order/priority — and fall back to own rules / platform defaults.
+    const pickedT1 = selectRoutingEndpoint([foreign, own, platform], "t1", { city: "São Paulo" });
+    expect(pickedT1?.endpointId).toBe("ep-own");
+
+    const fallback = selectRoutingEndpoint([foreign, platform], "t1", { city: "Recife" });
+    expect(fallback?.endpointId).toBe("ep-platform");
+
+    // The same foreign rule still serves its owner (correct destination id).
+    const pickedT2 = selectRoutingEndpoint([foreign, platform], "t2", { city: "Recife" });
+    expect(pickedT2?.endpointId).toBe("ep-foreign");
+  });
 });

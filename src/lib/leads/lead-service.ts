@@ -214,8 +214,14 @@ async function resolveFinancialEndpoint(
     termMonths: number | null;
   },
 ): Promise<{ endpoint: { id: string; name: string } | null; rule: RoutingCandidate | null }> {
+  // Absolute isolation: the query itself only returns this tenant's own rules
+  // plus platform defaults — no other subscriber's rule is even loaded.
   const rules = await prismaUnscoped.routingRule.findMany({
-    where: { isActive: true, endpoint: { isActive: true } },
+    where: {
+      isActive: true,
+      endpoint: { isActive: true },
+      OR: [{ tenantId: null }, { tenantId }],
+    },
     include: { endpoint: { select: { id: true, name: true } } },
   });
 
