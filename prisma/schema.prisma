@@ -1,0 +1,918 @@
+// =============================================================================
+// SaaS Imob — Prisma Schema (PostgreSQL 16)
+//
+// MULTI-TENANCY MODEL
+// -------------------
+// * Every tenant-owned entity carries a `tenantId` column.
+// * Foreign keys to `Tenant` are declared with `onDelete: Cascade` so that no
+//   orphan rows can survive tenant deletion (defense in depth against leakage).
+// * Composite indexes on `(tenantId, id)` are declared for every tenant-scoped
+//   table and match the composite-partitioning / sharding strategy we use later.
+// * The Prisma client extension in `src/lib/prisma/tenant-extension.ts`
+//   *enforces* tenantId injection at the ORM layer (fail-closed), so any query
+//   that is not running inside a tenant context cannot touch tenant data.
+//
+// MASTER (platform) users: `User.tenantId` is nullable. NULL means the user is
+// a platform-level administrator with no tenant boundary (guarded by RBAC).
+// All other roles MUST have a tenant.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Enums
+// -----------------------------------------------------------------------------
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  BLOCKED
+  CANCELLED
+}
+
+enum UserRole {
+  MASTER
+  OWNER
+  MANAGER
+  AGENT
+  RECEPTIONIST
+}
+
+enum PropertyStatus {
+  ACTIVE
+  INACTIVE
+  SOLD
+  RENTED
+}
+
+enum PropertyTarget {
+  SALE
+  RENT
+  BOTH
+}
+
+enum PropertyCategory {
+  APARTMENT
+  HOUSE
+  COMMERCIAL
+  LAND
+  FARM
+  OFFICE
+  GARAGE
+  OTHER
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+}
+
+enum MediaStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum ImportFileKind {
+  XML
+  CSV
+  JSON
+}
+
+enum ImportSource {
+  VIVA_REAL
+  ZAP
+  CSV
+  REST_API
+  MANUAL
+}
+
+enum ImportStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  PARTIAL
+  FAILED
+}
+
+enum LeadType {
+  BUYER
+  SELLER
+  RENTER
+  INVESTOR
+  /// Acquisition / financing request — routes to an external partner by rule.
+  FINANCIAL
+}
+
+enum LeadOrigin {
+  SITE_FORM
+  PORTAL
+  SOCIAL_MEDIA
+  PHONE_CALL
+  INDICATION
+  MANUAL
+  INTEGRATION
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL_SENT
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum WebhookEndpointScope {
+  REAL_ESTATE
+  FINANCIAL
+}
+
+enum WebhookStrategy {
+  /// Identity-mapped passthrough (fields forwarded as submitted, normalized).
+  CUSTOM_JSON
+  /// Partner financing-contract JSON (property value, down payment, income…).
+  FINANCE_DEFAULT
+  /// Real-estate CRM JSON (interested-party record on a property).
+  CRM_DEFAULT
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  IN_FLIGHT
+  DELIVERED
+  FAILED
+  DEAD_LETTERED
+}
+
+// --- Phase 5 — Billing, subscriptions, dunning -------------------------------
+
+/// Payment gateway / provider that owns a subscription or invoice.
+enum BillingProvider {
+  STRIPE
+  ASAAS
+  CUSTOM
+}
+
+/// Recurring billing cycle. Yearly prices are normalized to monthly for MRR.
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+/// Lifecycle of a webhook event received from a payment provider.
+enum BillingEventStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+/// Lifecycle of a billing invoice (mirrors the provider's payment state).
+enum PaymentInvoiceStatus {
+  OPEN
+  OVERDUE
+  PAID
+  REFUNDED
+  VOID
+}
+
+/// Dunning / account-lockout notification stages.
+enum BillingNotificationKind {
+  PRE_DUE
+  PAYMENT_FAILED
+  GRACE_EXPIRED
+  REACTIVATED
+}
+
+/// A one-off highlight add-on purchase (extra boosts above plan allocation).
+enum HighlightPurchaseStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+/// Reason a highlight-credit ledger entry was created.
+enum HighlightLedgerKind {
+  /// Periodic entitlement granted by the active plan (renewed on invoice.paid).
+  PLAN_ALLOTMENT
+  /// Purchased as a one-off add-on.
+  TOPUP
+  /// Consumed by activating a property highlight.
+  ACTIVATION_DEBIT
+  /// Manual correction by platform ops.
+  ADJUSTMENT
+}
+
+/// Origin of an active property highlight window.
+enum HighlightSource {
+  PLAN
+  PURCHASED
+}
+
+// -----------------------------------------------------------------------------
+// Platform-level (NOT tenant-scoped)
+// -----------------------------------------------------------------------------
+
+/// Billing plan a tenant is subscribed to. Owned by the platform, shared by
+/// every tenant. Master Admin configures plans dynamically (no code changes):
+/// price, billing cycle, property/agent/lead limits and included highlight
+/// credits. Legacy `features` keeps the Phase 2 dashboard contract working —
+/// the typed scalar columns are the source of truth for Phase 5 enforcement.
+model Plan {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  priceCents  Int      @default(0) // per `billingCycle` in cents (0 = free)
+  billingCycle      BillingCycle @default(MONTHLY)
+  // Resource entitlements (NULL = unlimited).
+  maxProperties Int?
+  maxUsers      Int?
+  maxLeads      Int?
+  /// Included highlight credits granted at each paid period (renewed on pay).
+  highlightCredits Int      @default(0)
+  /// Days a PAST_DUE account is allowed before automatic suspension.
+  gracePeriodDays  Int      @default(5)
+  /// Days of free trial granted at provisioning.
+  trialDays        Int      @default(14)
+  features    Json? // legacy/auxiliary feature keys (Phase 2 contract)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenants Tenant[]
+  planOverrides Tenant[] @relation("PlanOverride")
+  subscriptions TenantSubscription[]
+
+  @@index([isActive])
+}
+
+/// A customer organization. One row per company using the platform.
+model Tenant {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique // stable, lower-case; used for subdomain resolution
+  status    TenantStatus @default(TRIAL)
+  planId    String
+  plan      Plan         @relation(fields: [planId], references: [id], onDelete: Restrict)
+  /// Manual (ops-initiated) lockout — independent of the billing state machine.
+  /// When set, the tenant is BLOCKED regardless of subscription status.
+  manualBlockedAt DateTime?
+  blockReason      String?
+  /// Master Admin plan override — temporarily bills/serves the tenant on a
+  /// different plan without changing the underlying subscription.
+  planOverridePlanId String?
+  planOverridePlan   Plan?      @relation("PlanOverride", fields: [planOverridePlanId], references: [id], onDelete: SetNull)
+  planOverrideUntil  DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  subscription   TenantSubscription?
+  invoices       PaymentInvoice[]
+  notifications  BillingNotification[]
+  highlightLedger HighlightCreditLedger[]
+  highlightPurchases HighlightPurchase[]
+  propertyHighlights  PropertyHighlight[]
+
+  users         User[]
+  properties    Property[]
+  leads         Lead[]
+  auditLogs     AuditLog[]
+  media         PropertyMedia[]
+  propertyViews PropertyView[]
+  patterns      PropertyPattern[]
+  importBatches ImportBatch[]
+  leadConsents  LeadConsent[]
+  financeProfiles FinancialLeadProfile[]
+  webhookEndpoints WebhookEndpoint[]
+  routingRules  RoutingRule[]
+  webhookDeliveries WebhookDelivery[]
+  webhookDeliveryAttempts WebhookDeliveryAttempt[]
+
+  @@index([status])
+  @@index([planId])
+  @@index([manualBlockedAt])
+}
+
+/// Recurring subscription for one tenant. `status` mirrors `TenantStatus`
+/// values (TRIAL/ACTIVE/PAST_DUE/BLOCKED/CANCELLED); the tenant's effective
+/// status is derived from this row — unless a manual ops block or plan override
+/// is in effect (see src/lib/billing/service.ts).
+model TenantSubscription {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Restrict)
+  provider  BillingProvider @default(STRIPE)
+  status    TenantStatus    @default(TRIAL)
+
+  /// Gateway identifiers. `providerSubscriptionId` is globally unique, so an
+  /// invoice/subs webhook can always re-resolve the tenant (idempotency).
+  providerCustomerId     String? @unique
+  providerSubscriptionId String? @unique
+
+  /// Price + cycle snapshot taken at (re)provisioning — stable for MRR math.
+  priceCents  Int         @default(0)
+  billingCycle BillingCycle @default(MONTHLY)
+
+  trialEndsAt         DateTime?
+  currentPeriodStart  DateTime?
+  currentPeriodEnd    DateTime?
+  /// When a PAST_DUE invoice is unpaid, the moment the account auto-suspends.
+  graceEndsAt      DateTime?
+  nextInvoiceDueAt DateTime?
+  lastPaymentAt    DateTime?
+  blockedAt        DateTime?
+  cancelledAt      DateTime?
+  providerRaw      Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoices      PaymentInvoice[]
+  notifications BillingNotification[]
+
+  @@index([status])
+  @@index([planId])
+  @@index([graceEndsAt])
+  @@index([nextInvoiceDueAt])
+}
+
+/// A payment line item / invoice produced by the gateway for a subscription.
+model PaymentInvoice {
+  id              String    @id @default(cuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscriptionId  String?
+  subscription    TenantSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  providerInvoiceId String?  @unique
+  amountCents     Int       @default(0)
+  status          PaymentInvoiceStatus @default(OPEN)
+  dueDate         DateTime
+  paidAt          DateTime?
+  attempts        Int       @default(0)
+  metadata        Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+  @@index([tenantId, paidAt])
+}
+
+/// Dunning / lifecycle notifications sent to a tenant (auditable trigger log).
+/// The actual delivery channel (e-mail/SMS) is out of Phase 5 scope; the
+/// trigger + payload are recorded so any channel can consume them.
+model BillingNotification {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscriptionId String?
+  subscription   TenantSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  kind           BillingNotificationKind
+  /// Due date this notification refers to (dedupe key: tenant + kind + dueDate).
+  dueDate        DateTime
+  payload        Json?
+  createdAt      DateTime @default(now())
+
+  @@unique([tenantId, kind, dueDate])
+  @@index([tenantId, kind])
+  @@index([tenantId, createdAt])
+}
+
+/// One-off highlight add-on purchase (extra boosts above the plan allowance).
+model HighlightPurchase {
+  id              String   @id @default(cuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creditsBought   Int      @default(1)
+  unitPriceCents  Int      @default(0)
+  totalPriceCents Int      @default(0) // creditsBought * unitPriceCents
+  provider        BillingProvider @default(CUSTOM)
+  providerPaymentId String? @unique
+  status          HighlightPurchaseStatus @default(PENDING)
+  checkoutUrl     String?
+  metadata        Json?
+  paidAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  highlight PropertyHighlight?
+  ledger    HighlightCreditLedger[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+}
+
+/// Current highlight window for a property (1:1 with the property). Buying a
+/// boost replaces/extends the window; `endsAt` expiry is enforced by the
+/// scheduled expiry worker (auto de-feature).
+model PropertyHighlight {
+  id            String          @id @default(cuid())
+  tenantId      String
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  propertyId    String          @unique
+  property      Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  purchaseId    String?         @unique
+  purchase      HighlightPurchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  source        HighlightSource @default(PLAN)
+  startsAt      DateTime
+  endsAt        DateTime
+  /// Extra sort weight on the public portal (higher = earlier).
+  priorityBoost Int             @default(0)
+  createdAt     DateTime        @default(now())
+
+  @@index([tenantId, endsAt])
+  @@index([endsAt])
+}
+
+/// Append-only ledger of highlight credits (plan allotment, top-ups, spends).
+/// `balanceAfter` makes reconciliation trivial; rows are never mutated.
+model HighlightCreditLedger {
+  id            String            @id @default(cuid())
+  tenantId      String
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kind          HighlightLedgerKind
+  amount        Int               @default(0) // + allotment/topup, - debits
+  balanceBefore Int               @default(0)
+  balanceAfter  Int               @default(0)
+  purchaseId    String?
+  purchase      HighlightPurchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  note          String?
+  createdAt     DateTime          @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, kind])
+}
+
+/// Append-only ledger of provider webhook events. The unique
+/// (provider, providerEventId) tuple guarantees idempotent reprocessing.
+model BillingEvent {
+  id              String            @id @default(cuid())
+  provider        BillingProvider
+  providerEventId String
+  type            String
+  status          BillingEventStatus @default(RECEIVED)
+  /// Tenant resolved from provider metadata at processing time (nullable for
+  /// events tied to orphaned/deleted accounts).
+  tenantId        String?
+  payload         Json
+  error           String?
+  receivedAt      DateTime          @default(now())
+  processedAt     DateTime?
+
+  @@unique([provider, providerEventId])
+  @@index([status])
+  @@index([tenantId, receivedAt])
+}
+
+// -----------------------------------------------------------------------------
+// Tenant-scoped entities (the Prisma extension enforces the `tenantId`)
+// -----------------------------------------------------------------------------
+
+model User {
+  id           String    @id @default(cuid())
+  /// NULL only for MASTER platform administrators (see header comment).
+  tenantId     String?
+  tenant       Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  email        String    @unique // one identity across the platform (login keys)
+  passwordHash String // argon2/bcrypt hash — never a plaintext
+  role         UserRole  @default(AGENT)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  auditLogs AuditLog[]
+  assignedLeads Lead[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([tenantId])
+  @@index([tenantId, id])
+  @@index([role])
+}
+
+/// Single-use password-reset token (Phase 6). Stored hashed (SHA-256 of the
+/// raw token) so a DB leak never exposes a usable reset link. A token is
+/// redeemed exactly once (`usedAt` set atomically at reset).
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SHA-256 hex digest of the raw token (never store the raw value).
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Property {
+  id           String           @id @default(cuid())
+  tenantId     String
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Stable internal reference — dedupe key for external imports.
+  code         String // unique within the tenant
+  /// External system/portal reference (VivaReal, ZAP, ERP…) used for import dedupe.
+  externalCode String?
+  title        String
+  description  String?
+  target       PropertyTarget   @default(SALE)
+  category     PropertyCategory @default(APARTMENT)
+  status       PropertyStatus   @default(ACTIVE)
+
+  // Pricing (BRL — handle formatting per tenant locale)
+  salePrice   Decimal? @db.Decimal(12, 2)
+  rentPrice   Decimal? @db.Decimal(12, 2)
+  condoFee    Decimal? @db.Decimal(12, 2)
+  propertyTax Decimal? @db.Decimal(12, 2)
+
+  // Location
+  address      String?
+  number       String?
+  city         String
+  state        String // UF — 'SP', 'RJ', ...
+  neighborhood String?
+  zipCode      String?
+  latitude     Decimal? @db.Decimal(10, 7)
+  longitude    Decimal? @db.Decimal(10, 7)
+
+// SEO / public portal
+  /// Human-friendly, globally unique URL segment for the public PDP
+  /// (e.g. `apartamento-copacabana-rj-100`). Nullable so legacy rows can be
+  /// backfilled lazily; generated on create/duplicate by property-service.
+  slug       String?   @unique
+  /// Denormalized search haystack: lowercased title/code/city/state/
+  /// neighborhood/address. Maintained on write; queried via ILIKE `contains`
+  /// on the public portal (and indexed with a `to_tsvector` GIN in migration).
+  searchText String?
+
+  // Specs
+  area         Decimal? @db.Decimal(10, 2) // built area in m²
+  bedrooms     Int?
+  suites       Int?
+  bathrooms    Int?
+  parkingSpots Int?
+
+  // Flags
+  isFeatured  Boolean @default(false)
+  isFurnished Boolean @default(false)
+  // `isActive` is the soft-delete flag (the authoritative "listed" state is `status`).
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  media    PropertyMedia[]
+  views    PropertyView[]
+  patterns PropertyPattern[]
+  leads    Lead[]
+  highlights PropertyHighlight[]
+
+  // Composed keys let the same `code` / `externalCode` exist across tenants.
+  @@unique([tenantId, code])
+  @@unique([tenantId, externalCode])
+  @@index([tenantId, id])
+  @@index([tenantId, status])
+  @@index([tenantId, isActive])
+  @@index([tenantId, category])
+  @@index([city, state])
+  @@index([city, state, neighborhood])
+  @@index([neighborhood])
+  @@index([searchText])
+}
+
+model PropertyMedia {
+  id         String      @id @default(cuid())
+  tenantId   String
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  propertyId String
+  property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  kind       MediaKind   @default(IMAGE)
+  /// Storage key inside the tenant storage root bucket prefix.
+  objectKey  String?
+  /// Map of processed variants -> object keys, e.g. { thumbnail, medium, large }.
+  variants   Json?
+  /// Public/CDN absolute URL used by consumers.
+  url        String?
+  status     MediaStatus @default(PENDING)
+  sortOrder  Int         @default(0)
+  isPrimary  Boolean     @default(false)
+  width      Int?
+  height     Int?
+  mimeType   String?
+  sizeBytes  Int?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@unique([propertyId, objectKey])
+  @@index([tenantId, id])
+  @@index([propertyId, isPrimary])
+  @@index([tenantId, status])
+}
+
+model PropertyView {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  /// Counting every page impression as a view keeps analytics simple and reliable.
+  viewer     String? // hashed fingerprint / user id / anonymous marker
+  channel    String? // e.g. 'site', 'portal', 'social' (Lead.origin-derived)
+  pageUrl    String?
+  userAgent  String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([propertyId, createdAt])
+  @@index([tenantId, createdAt])
+}
+
+model PropertyPattern {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  propertyId String   @unique
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  /// Time-of-day bucket (0-23) for the peak page-view window of this property.
+  peakHour   Int?
+  peakDay    Int? // 0=Sunday … 6=Saturday
+  views7d    Int      @default(0)
+  views30d   Int      @default(0)
+  leads7d    Int      @default(0)
+  leads30d   Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@index([tenantId, views30d])
+}
+
+model Lead {
+  id         String     @id @default(cuid())
+  tenantId   String
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Property this lead is interested in, when originated from a listing.
+  propertyId String?
+  property   Property?  @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  name       String
+  email      String?
+  phone      String?
+  type       LeadType   @default(BUYER)
+  origin     LeadOrigin @default(SITE_FORM)
+  status     LeadStatus @default(NEW)
+  /// Routing target — the tenant OWNER for real-estate leads (see routing
+  /// worker); never cross-tenant, always resolved inside the lead's tenant.
+  assignedToId String?
+  assignedTo   User?    @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  /// Flexible capture payload (form data, UTM params, enrichment, routing metadata…).
+  payload    Json?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  consent         LeadConsent?
+  financeProfile  FinancialLeadProfile?
+  deliveries      WebhookDelivery[]
+
+  @@index([tenantId, id])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([propertyId])
+  @@index([assignedToId])
+}
+
+/// LGPD consent record tied to a single lead (1:1). Immutable proof that the
+/// data subject granted data processing for this capture: exact consent text
+/// shown, version, timestamp, IP and origin URL. No lead is ever created
+/// without its consent row (enforced by the capture service).
+model LeadConsent {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leadId      String   @unique
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  /// Version of the consent statement shown to the user (e.g. "2026-08-19.v1").
+  textVersion String
+  /// The exact processing rationale displayed at capture time.
+  consentText String
+  grantedAt   DateTime @default(now())
+  ipAddress   String?
+  originUrl   String?
+  userAgent   String?
+  /// True when the user later withdraws consent (right to erasure/withdrawal).
+  optedOut    Boolean  @default(false)
+  optedOutAt  DateTime?
+
+  @@index([tenantId, id])
+  @@index([tenantId, grantedAt])
+}
+
+/// Structured acquisition/financing request attached to a FINANCIAL lead (1:1).
+/// Typed decimal columns (not JSON) so underwriting/routing math and reporting
+/// are correct and indexable.
+model FinancialLeadProfile {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leadId                String   @unique
+  lead                  Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  propertyValue         Decimal? @db.Decimal(14, 2) // target property value
+  downPayment           Decimal? @db.Decimal(14, 2) // entrada
+  financingAmount       Decimal? @db.Decimal(14, 2) // requested financed amount
+  monthlyIncome         Decimal? @db.Decimal(14, 2)
+  monthlyInstallmentLimit Decimal? @db.Decimal(14, 2)
+  termMonths            Int?
+  city                  String?
+  state                 String?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, id])
+  @@index([tenantId, monthlyIncome])
+  @@index([tenantId, propertyValue])
+}
+
+/// Destination endpoint for outbound lead webhooks. `tenantId` NULL rows are
+/// platform-owned (available to every tenant via routing); tenant rows are
+/// private to that subscriber. HMAC secrets are encrypted at rest with
+/// AES-256-GCM when INTEGRATION_SECRET_KEY is configured.
+model WebhookEndpoint {
+  id            String                @id @default(cuid())
+  tenantId      String?
+  tenant        Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  strategy      WebhookStrategy       @default(CUSTOM_JSON)
+  scope         WebhookEndpointScope  @default(FINANCIAL)
+  /// Full destination URL (http/https only; enforced at dispatch time).
+  baseUrl       String
+  method        String                @default("POST")
+  /// Encrypted HMAC shared secret (or plaintext in dev when no key is set).
+  hmacSecret    String?
+  isActive      Boolean               @default(true)
+  timeoutMs     Int                   @default(10000)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  routingRules RoutingRule[]
+  deliveries   WebhookDelivery[]
+
+  @@index([tenantId, isActive])
+  @@index([scope, isActive])
+}
+
+/// Dynamic lead-routing rule. `tenantId` NULL = platform default applied when
+/// no tenant-specific rule matches. Rules are evaluated in order (tenant rules
+/// first, then priority ASC) and the FIRST fully matching rule wins. All
+/// filters are optional — an empty rule matches everything, so ordering is the
+/// tenant's responsibility.
+model RoutingRule {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  isActive  Boolean  @default(true)
+  /// Lower value = evaluated earlier (within the same tenant scope).
+  priority  Int      @default(100)
+
+  // Filters (intersection — every set filter must match)
+  city              String?
+  state             String?
+  minMonthlyIncome  Decimal? @db.Decimal(14, 2)
+  maxMonthlyIncome  Decimal? @db.Decimal(14, 2)
+  minPropertyValue  Decimal? @db.Decimal(14, 2)
+  maxPropertyValue  Decimal? @db.Decimal(14, 2)
+  minTermMonths     Int?
+  maxTermMonths     Int?
+
+  endpointId String
+  endpoint   WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, isActive])
+  @@index([endpointId])
+}
+
+/// Aggregate dispatch record for one lead -> one endpoint. Carries the stable
+/// `idempotencyKey` (shared by every retry attempt so the recipient CRM can
+/// deduplicate) and the lifecycle status used by the ops console.
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  tenantId       String
+  tenant         Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leadId         String
+  lead           Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  endpointId     String
+  endpoint       WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Restrict)
+  /// sha256(tenant:lead:endpoint) — stable across BullMQ retries.
+  idempotencyKey String                @unique
+  status         WebhookDeliveryStatus @default(PENDING)
+  attemptsCount  Int                   @default(0)
+  lastError      String?
+  nextAttemptAt  DateTime?
+  deliveredAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attempts WebhookDeliveryAttempt[]
+
+  @@unique([leadId, endpointId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([endpointId])
+  @@index([deliveredAt])
+}
+
+/// One full execution record per transmission attempt. Written durably BEFORE
+/// the HTTP call (IN_FLIGHT) and updated with the outcome — so even a crashed
+/// attempt leaves an auditable trace (zero-loss logging).
+model WebhookDeliveryAttempt {
+  id               String @id @default(cuid())
+  tenantId         String
+  tenant           Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveryId       String
+  delivery         WebhookDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  leadId           String
+  endpointId       String
+  /// 1-based attempt number (mirrors BullMQ `attemptsMade + 1`).
+  attemptNumber    Int
+  destinationUrl   String
+  requestPayload   Json?
+  signature        String?
+  responseStatus   Int?
+  responseBody     String?
+  executionTimeMs  Int?
+  success          Boolean  @default(false)
+  error            String?
+
+  createdAt DateTime @default(now())
+
+  @@index([deliveryId, attemptNumber])
+  @@index([tenantId, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  /// NULL only for platform-level events (e.g. MASTER creating a tenant).
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String? // NULL for unauthenticated/system events
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String // one of AUDIT_ACTIONS (see src/lib/audit/actions.ts)
+  entity    String // e.g. "Property", "Lead", "Tenant", "User"
+  entityId  String?
+  details   Json? // structured context payload
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, id])
+  @@index([tenantId, action])
+  @@index([entity, entityId])
+}
+
+model ImportBatch {
+  id            String         @id @default(cuid())
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orgId         String? // lifecycle id for the queue job (IdempotencyKey)
+  source        ImportSource   @default(MANUAL)
+  fileKind      ImportFileKind @default(CSV)
+  /// Original uploaded file name.
+  fileName      String?
+  status        ImportStatus   @default(QUEUED)
+  totalRows     Int            @default(0)
+  processedRows Int            @default(0)
+  importedRows  Int            @default(0)
+  updatedRows   Int            @default(0)
+  skippedRows   Int            @default(0)
+  failedRows    Int            @default(0)
+  /// Standard structured error payloads, one per failed row.
+  errors        Json?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+}

@@ -1,0 +1,18 @@
+# -----------------------------------------------------------------------------
+# Development image — hot reload with Node 20 LTS.
+# The host workspace is bind-mounted over /app by docker-compose.
+# -----------------------------------------------------------------------------
+FROM node:20-alpine
+
+ENV NODE_ENV=development
+WORKDIR /app
+
+# Install dependencies first so layer caching is effective.
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Copy the rest of the source (ignored files are filtered by .dockerignore).
+COPY . .
+
+EXPOSE 3000
+CMD ["npm", "run", "dev"]

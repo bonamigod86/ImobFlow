@@ -1,0 +1,162 @@
+version: "3.9"
+
+# -----------------------------------------------------------------------------
+# SaaS Imob — Local / Staging infrastructure (Phase 1)
+#
+#   postgres : PostgreSQL 16 — source of truth (tenant_id row-segregated data)
+#   redis    : Redis 7       — cache + BullMQ broker (queues, retries, DLQ)
+#   app      : Next.js dev container (hot reload via bind mount)
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose up -d --build
+#   docker compose exec app npx prisma migrate deploy
+#   docker compose exec app npm run db:seed
+# -----------------------------------------------------------------------------
+
+name: saas-imob
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: saas-imob-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-saas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-saas_password}
+      POSTGRES_DB: ${POSTGRES_DB:-saas_imob}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-saas} -d ${POSTGRES_DB:-saas_imob}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - saas
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: saas-imob-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - saas
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: saas-imob-app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-saas}:${POSTGRES_PASSWORD:-saas_password}@postgres:5432/${POSTGRES_DB:-saas_imob}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      SESSION_COOKIE: ${SESSION_COOKIE:-saas_session}
+      APP_DOMAIN: ${APP_DOMAIN:-saas.local}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-ChangeMe-123!}
+    volumes:
+      # Hot reload: mount the whole workspace, keep node_modules & build artifacts
+      # on the (anonymous) container filesystem to avoid host/container mismatch.
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    command: sh -c "npx prisma generate && npm run dev"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - saas
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: standalone queue worker container (one process per concern).
+  # Enable by uncommenting below when running the stack with `docker compose --profile workers up`.
+  worker:
+    profile: workers
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: saas-imob-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-saas}:${POSTGRES_PASSWORD:-saas_password}@postgres:5432/${POSTGRES_DB:-saas_imob}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      SESSION_COOKIE: ${SESSION_COOKIE:-saas_session}
+      APP_DOMAIN: ${APP_DOMAIN:-saas.local}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    command: sh -c "npx prisma generate && npm run worker"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - saas
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  saas:
+    driver: bridge
