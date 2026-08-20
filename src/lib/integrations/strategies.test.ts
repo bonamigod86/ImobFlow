@@ -128,10 +128,10 @@ describe("resolveAdapter + adapters", () => {
     expect((out.utm as { source: string }).source).toBe("google");
   });
 
-  it("FINANCE_DEFAULT converts BRL decimals to numbers", () => {
+  it("FINANCE_DEFAULT converts BRL decimals to numbers + identifies origin/property/interest", () => {
     const finEnvelope: LeadEnvelope = {
       ...envelope,
-      lead: { ...envelope.lead, type: "FINANCIAL" },
+      lead: { ...envelope.lead, type: "FINANCIAL", origin: "SITE_FORM", payload: { source: "portal-financing", interestType: "simulacao" } },
       finance: {
         propertyValue: "720000.00",
         downPayment: "144000.00",
@@ -145,6 +145,9 @@ describe("resolveAdapter + adapters", () => {
     };
     const out = resolveAdapter("FINANCE_DEFAULT")(finEnvelope) as {
       event: string;
+      origin: string;
+      interest_type: string | null;
+      property: { id: string; code: string } | null;
       financial: {
         property_value: number;
         down_payment: number;
@@ -156,6 +159,9 @@ describe("resolveAdapter + adapters", () => {
       location: { city: string | null; state: string | null };
     };
     expect(out.event).toBe("acquisition.financial_request");
+    expect(out.origin).toBe("site_form");
+    expect(out.interest_type).toBe("simulacao");
+    expect(out.property).toMatchObject({ id: "p1", code: "ACA-001" });
     expect(out.financial.property_value).toBe(720000);
     expect(out.financial.monthly_installment_limit).toBe(5500);
     expect(out.financial.term_months).toBe(360);

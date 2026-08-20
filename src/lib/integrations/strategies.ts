@@ -86,6 +86,7 @@ function crmDefault(envelope: LeadEnvelope): Record<string, unknown> {
         }
       : null,
     interest: lead.type === "RENTER" ? "rent" : "buy",
+    interest_type: typeof payload.interestType === "string" ? payload.interestType : null,
     source: lead.origin.toLowerCase(),
     utm,
     message: typeof payload.message === "string" ? payload.message : null,
@@ -95,19 +96,30 @@ function crmDefault(envelope: LeadEnvelope): Record<string, unknown> {
 
 /**
  * Partner financing contract (acquired-loan / credit originator): the financial
- * profile a credit partner needs to quote — always BRL values.
+ * profile a credit partner needs to quote — always BRL values. Carries origin +
+ * interest type + property reference so the receiver identifies the source,
+ * the listing and the requested intent (checklist item 10).
  */
 function financeDefault(envelope: LeadEnvelope): Record<string, unknown> {
-  const { lead, finance } = envelope;
+  const { lead, finance, property } = envelope;
+  const payload = (lead.payload ?? {}) as Record<string, unknown>;
   return {
     event: "acquisition.financial_request",
     lead_id: lead.id,
     tenant_id: lead.tenantId,
+    origin: lead.origin.toLowerCase(),
+    interest_type: typeof payload.interestType === "string" ? payload.interestType : null,
     contact: {
       name: lead.name,
       email: lead.email,
       phone: lead.phone,
     },
+    property: property
+      ? {
+          id: property.id,
+          code: property.code,
+        }
+      : null,
     financial: {
       property_value: asNumber(finance?.propertyValue ?? null),
       down_payment: asNumber(finance?.downPayment ?? null),

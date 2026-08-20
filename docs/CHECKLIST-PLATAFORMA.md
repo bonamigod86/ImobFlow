@@ -390,6 +390,55 @@ correto e isolamento absoluto entre clientes.
 
 ---
 
+## Item 10 — Integração com sistemas externos
+
+Status: **100% implementado**. Integração via API/webhook com identificação de
+origem/imóvel/interesse, transmissão de dados autorizados, tenant de destino e
+registro de sucesso/falha. Credenciais de sistemas externos **não** fazem parte
+do entregável (fornecidas só ao profissional selecionado).
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 10.1 | Integração via API e/ou webhook com sistemas externos | OK | `WebhookEndpoint` (`REAL_ESTATE`/`FINANCIAL`) + `POST/GET/PATCH/DELETE /api/webhook-endpoints`; transmissão em fila `webhook-transmission-queue` |
+| 10.2 | Registrar o lead quando atender às regras | OK | Captura persiste `Lead` + consentimento; `createDeliveryAndEnqueue` cria entrega durável por destino quando regra casa |
+| 10.3 | Identificar origem | OK | `origin` (SITE_FORM/…) + `payload.source`/`channel`; `CRM_DEFAULT`/`FINANCE_DEFAULT` transmitem `origin` |
+| 10.4 | Identificar imóvel | OK | `propertyId` + `payload.propertySnapshot`; adapters transmitem `property.{id,code}` |
+| 10.5 | Identificar tipo de interesse | OK | `type` (BUYER/RENTER/FINANCIAL) + `interestType`; adapters transmitem `interest_type` |
+| 10.6 | Transmitir apenas dados autorizados | OK | `strategy` governa o subconjunto (contato, imóvel, perfil financeiro); IP/UA/consentimento **não** saem do servidor |
+| 10.7 | Identificar conta/tenant de destino | OK | `WebhookDelivery.tenantId` + `endpointId` (endpoint do tenant ou plataforma; nunca de outro assinante) + `tenant_id` no envelope |
+| 10.8 | Registrar sucesso ou falha | OK | `WebhookDelivery.status` (`PENDING→IN_FLIGHT→DELIVERED/FAILED/DEAD_LETTERED`), `attemptsCount`, `lastError`, tentativas detalhadas; observabilidade via `GET /api/webhook-deliveries(/{id})`, DLQ + `replay` |
+| 10.9 | Docs/credenciais só ao profissional selecionado | OK | Contrato de integração público em `API_AND_WEBHOOK_SPECIFICATION.md` **§3.4**; nenhuma credencial no repo |
+
+### Testes manuais realizados (via HTTP)
+
+1. `GET /api/webhook-deliveries` (acme) → N entregas corretas (assinante apenas;
+   `MASTER` vê tudo), com endpoint/scope/`_count.attempts`.
+2. `GET /api/webhook-deliveries/[id]` → detalhe da entrega (endpoint, estado).
+3. Lead imobiliário → entrega para `CRM Vivo Sales (central)` (scope
+   `REAL_ESTATE`, estratégia `CRM_DEFAULT`).
+4. Lead financeiro → entrega para `CredFácil Fintech (parceiro)` (scope
+   `FINANCIAL`, estratégia `FINANCE_DEFAULT`) com `matchedRuleId` correto.
+5. Assinatura/dedupe: `x-idempotency-key` e `X-Saas-Imob-Signature` (HMAC)
+   documentados e testados por unidade; sem Redis local as entregas ficam
+   `PENDING` (em produção o worker transmite, registrando `DELIVERED`/`FAILED`).
+
+---
+
+## Correções aplicadas após a auditoria (Item 10)
+
+1. **`FINANCE_DEFAULT` não identificava origem/imóvel/interesse** — o envelope
+   do parceiro não trazia `origin`, `interest_type` nem `property.{id,code}`;
+   adicionados (§10.3–10.5) em `src/lib/integrations/strategies.ts`.
+2. **`CRM_DEFAULT` sem `interest_type`** — passou a transmitir a intenção de
+   CTA junto com `interest` (rent/buy).
+3. **Contrato de integração não explicado** — nova seção **§3.4** na
+   `API_AND_WEBHOOK_SPECIFICATION.md`: registro, disparo por regras, dados
+   autorizados por estratégia, sucesso/falha e a nota de que credenciais de
+   sistemas externos são provisionadas apenas ao profissional selecionado.
+4. **Checklist sem rastreabilidade** — seção Item 10 criada (10.1–10.9 + testes).
+
+---
+
 ## Correções aplicadas após a auditoria (Item 5)
 
 1. **Duplicar conflitava no `externalCode`** — `duplicateProperty` copiava o

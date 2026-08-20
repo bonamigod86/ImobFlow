@@ -339,6 +339,28 @@ comparar em tempo constante.
   reprocessamento manual (`POST /api/jobs/{jobId}/replay`).
 - Timeout por chamada: `endpoint.timeoutMs`.
 
+### 3.4 Contrato de integração (sistemas externos)
+
+- **Registro no portal**: todo lead (imobiliário ou de aquisição) é persistido
+  com origem (`origin` + `payload.source/channel`), imóvel (`propertyId` +
+  `propertySnapshot`) e tipo de interesse (`type` + `interestType`).
+- **Disparo**: quando o lead atende às regras configuradas, é criada uma
+  `WebhookDelivery` tomada pelo `leadId`, com `endpointId` (conta/tenant de
+  destino: endpoint do próprio tenant ou da plataforma) e chave de idempotência.
+- **Dados autorizados**: cada `strategy` transmite apenas o subconjunto
+  permitido — `CRM_DEFAULT` (contato + imóvel + origem + interesse),
+  `FINANCE_DEFAULT` (contato + imóvel + perfil financeiro + origem +
+  `interest_type`), `CUSTOM_JSON` (envelope canônico). Dados sensíveis (IP, UA,
+  consentimento) **não** são transmitidos; ficam no servidor.
+- **Sucesso/falha**: a `WebhookDelivery` registra `PENDING → IN_FLIGHT →
+  DELIVERED | FAILED | DEAD_LETTERED`, com `attemptsCount`, `lastError` e o
+  log de tentativas (`WebhookDeliveryAttempt`: status HTTP, corpo, latência).
+- **Credenciais**: a documentação técnica e as credenciais específicas de cada
+  sistema externo são fornecidas somente ao profissional selecionado — não
+  fazem parte do repositório/deploy. O receptor valida
+  `X-Saas-Imob-Signature` (HMAC-SHA256, §3.2) e usa `x-idempotency-key` para
+  deduplicar reentregas.
+
 ---
 
 ## 4. Rate limiting
