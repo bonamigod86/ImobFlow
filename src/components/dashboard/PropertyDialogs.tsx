@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { PropertyThumb } from "@/components/dashboard/PropertyThumb";
 import { FormDialog } from "@/components/dashboard/PropertyFormDialog";
+import { MediaManagerDialog } from "@/components/dashboard/MediaManagerDialog";
 import type { PropertyRow } from "@/components/dashboard/types";
 import { CATEGORY_LABELS } from "@/lib/public/types";
 import {
@@ -29,6 +30,7 @@ export type PropertyAction =
   | { kind: "new" }
   | { kind: "view"; property: PropertyRow }
   | { kind: "edit"; property: PropertyRow }
+  | { kind: "media"; property: PropertyRow }
   | { kind: "delete"; property: PropertyRow };
 
 interface PropertyDialogsProps {
@@ -38,15 +40,20 @@ interface PropertyDialogsProps {
 }
 
 /**
- * Modal suite driven by the property table — view details, create/edit form
- * and a destructive delete confirmation. Mutations hit the tenant-scoped API
- * and report the result back to the table via `onSaved`.
+ * Modal suite driven by the property table — view details, create/edit form,
+ * gallery manager and a destructive delete confirmation. Mutations hit the
+ * tenant-scoped API and report the result back to the table via `onSaved`.
  */
 export function PropertyDialogs({ action, onClose, onSaved }: PropertyDialogsProps) {
   return (
     <>
       <ViewDialog action={action} onClose={onClose} />
       <FormDialog action={action} onClose={onClose} onSaved={onSaved} />
+      <MediaManagerDialog
+        property={action?.kind === "media" ? action.property : null}
+        onClose={onClose}
+        onChanged={onSaved}
+      />
       <DeleteDialog action={action} onClose={onClose} onSaved={onSaved} />
     </>
   );
@@ -80,9 +87,19 @@ function ViewDialog({ action, onClose }: { action: PropertyAction | null; onClos
 
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
               <ViewField label="Localização" value={locationForRow(property)} />
+              <ViewField label="Endereço" value={`${property.address ?? "—"}${property.number ? `, ${property.number}` : ""}${property.zipCode ? ` · ${property.zipCode}` : ""}`} />
+              <ViewField label="Código externo" value={property.externalCode ?? "—"} />
               <ViewField
                 label="Preço"
                 value={`${priceForRow(property).label}${priceForRow(property).period ?? ""}`}
+              />
+              <ViewField
+                label="Condomínio"
+                value={property.condoFee ? `${Number(property.condoFee).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/mês` : "—"}
+              />
+              <ViewField
+                label="IPTU"
+                value={property.propertyTax ? `${Number(property.propertyTax).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/ano` : "—"}
               />
               <ViewField
                 label="Área"
@@ -92,8 +109,14 @@ function ViewDialog({ action, onClose }: { action: PropertyAction | null; onClos
               <ViewField label="Suítes" value={property.suites?.toString() ?? "—"} />
               <ViewField label="Banheiros" value={property.bathrooms?.toString() ?? "—"} />
               <ViewField label="Vagas" value={property.parkingSpots?.toString() ?? "—"} />
+              <ViewField label="Finalidade" value={TARGET_LABELS[property.target]} />
               <ViewField label="Status no portal" value={property.isActive ? "Publicado" : "Oculto"} />
               <ViewField label="Destaque" value={property.isFeatured ? "Sim" : "Não"} />
+              <ViewField label="Mobiliado" value={property.isFurnished ? "Sim" : "Não"} />
+              <ViewField
+                label="Coordenadas"
+                value={property.latitude != null && property.longitude != null ? `${Number(property.latitude).toFixed(5)}, ${Number(property.longitude).toFixed(5)}` : "—"}
+              />
             </dl>
 
             {property.description && (

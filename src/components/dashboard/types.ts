@@ -19,17 +19,39 @@ export interface PropertyRow {
   city: string;
   state: string;
   neighborhood?: string | null;
+  zipCode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   area?: string | null;
   bedrooms?: number | null;
   suites?: number | null;
   bathrooms?: number | null;
   parkingSpots?: number | null;
+  isFurnished?: boolean | null;
   slug?: string | null;
   isActive: boolean;
   isFeatured: boolean;
   coverImage: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A media row as returned by GET /api/properties/[id] (JSON-serialized). */
+export interface PropertyMediaRow {
+  id: string;
+  propertyId: string;
+  kind: "IMAGE" | "VIDEO";
+  mimeType: string | null;
+  objectKey: string | null;
+  url: string | null;
+  variants: Record<string, string> | null;
+  isPrimary: boolean;
+  sortOrder: number;
+  status: "PENDING" | "PROCESSING" | "READY" | "FAILED";
+  sizeBytes: number | null;
+  width: number | null;
+  height: number | null;
+  createdAt: string;
 }
 
 export type { DashboardSnapshot };

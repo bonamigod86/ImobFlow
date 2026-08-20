@@ -27,36 +27,62 @@ const CATEGORY_OPTIONS = Object.keys(CATEGORY_LABELS) as Array<keyof typeof CATE
 
 type FormState = {
   code: string;
+  externalCode: string;
   title: string;
   description: string;
+  address: string;
+  number: string;
   city: string;
   state: string;
   neighborhood: string;
+  zipCode: string;
+  latitude: string;
+  longitude: string;
   target: (typeof TARGET_OPTIONS)[number];
   category: keyof typeof CATEGORY_LABELS;
   status: (typeof STATUS_OPTIONS)[number];
   salePrice: string;
   rentPrice: string;
+  condoFee: string;
+  propertyTax: string;
   area: string;
+  bedrooms: string;
+  suites: string;
+  bathrooms: string;
+  parkingSpots: string;
   isActive: boolean;
   isFeatured: boolean;
+  isFurnished: boolean;
 };
 
 const EMPTY_FORM: FormState = {
   code: "",
+  externalCode: "",
   title: "",
   description: "",
+  address: "",
+  number: "",
   city: "",
   state: "",
   neighborhood: "",
+  zipCode: "",
+  latitude: "",
+  longitude: "",
   target: "SALE",
   category: "APARTMENT",
   status: "ACTIVE",
   salePrice: "",
   rentPrice: "",
+  condoFee: "",
+  propertyTax: "",
   area: "",
+  bedrooms: "",
+  suites: "",
+  bathrooms: "",
+  parkingSpots: "",
   isActive: true,
   isFeatured: false,
+  isFurnished: false,
 };
 
 function toNumberOrNull(value: string): number | null {
@@ -64,6 +90,12 @@ function toNumberOrNull(value: string): number | null {
   if (trimmed === "") return null;
   const parsed = Number(trimmed.replace(/\./g, "").replace(",", "."));
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toIntOrNull(value: string): number | null {
+  const parsed = toNumberOrNull(value);
+  if (parsed === null) return null;
+  return Number.isInteger(parsed) ? parsed : Math.trunc(parsed);
 }
 
 export function FormDialog({
@@ -90,19 +122,32 @@ export function FormDialog({
     if (editing) {
       setForm({
         code: editing.code,
+        externalCode: editing.externalCode ?? "",
         title: editing.title,
         description: editing.description ?? "",
+        address: editing.address ?? "",
+        number: editing.number ?? "",
         city: editing.city,
         state: editing.state,
         neighborhood: editing.neighborhood ?? "",
+        zipCode: editing.zipCode ?? "",
+        latitude: editing.latitude != null ? String(editing.latitude) : "",
+        longitude: editing.longitude != null ? String(editing.longitude) : "",
         target: editing.target,
         category: (editing.category as keyof typeof CATEGORY_LABELS) ?? "APARTMENT",
         status: editing.status,
         salePrice: editing.salePrice ?? "",
         rentPrice: editing.rentPrice ?? "",
+        condoFee: editing.condoFee ?? "",
+        propertyTax: editing.propertyTax ?? "",
         area: editing.area ?? "",
+        bedrooms: editing.bedrooms != null ? String(editing.bedrooms) : "",
+        suites: editing.suites != null ? String(editing.suites) : "",
+        bathrooms: editing.bathrooms != null ? String(editing.bathrooms) : "",
+        parkingSpots: editing.parkingSpots != null ? String(editing.parkingSpots) : "",
         isActive: editing.isActive,
         isFeatured: editing.isFeatured,
+        isFurnished: editing.isFurnished ?? false,
       });
     } else {
       setForm(EMPTY_FORM);
@@ -132,19 +177,32 @@ export function FormDialog({
 
     const payload = {
       code: form.code.trim(),
+      externalCode: form.externalCode.trim() || null,
       title: form.title.trim(),
       description: form.description.trim() || null,
+      address: form.address.trim() || null,
+      number: form.number.trim() || null,
       city: form.city.trim(),
       state: form.state.trim().toUpperCase(),
       neighborhood: form.neighborhood.trim() || null,
+      zipCode: form.zipCode.trim() || null,
+      latitude: toNumberOrNull(form.latitude),
+      longitude: toNumberOrNull(form.longitude),
       target: form.target,
       category: form.category,
       status: form.status,
       salePrice,
       rentPrice,
+      condoFee: toNumberOrNull(form.condoFee),
+      propertyTax: toNumberOrNull(form.propertyTax),
       area: toNumberOrNull(form.area),
+      bedrooms: toIntOrNull(form.bedrooms),
+      suites: toIntOrNull(form.suites),
+      bathrooms: toIntOrNull(form.bathrooms),
+      parkingSpots: toIntOrNull(form.parkingSpots),
       isActive: form.isActive,
       isFeatured: form.isFeatured,
+      isFurnished: form.isFurnished,
     };
 
     setBusy(true);
@@ -194,12 +252,60 @@ export function FormDialog({
               maxLength={40}
             />
           </Field>
+          <Field label="Código externo" hint="opcional">
+            <Input
+              value={form.externalCode}
+              onChange={(e) => update("externalCode", e.target.value)}
+              placeholder="Ref. portais/construtora"
+              maxLength={120}
+            />
+          </Field>
           <Field label="Título">
             <Input
               value={form.title}
               onChange={(e) => update("title", e.target.value)}
               placeholder="Apartamento no Jardins"
               maxLength={255}
+            />
+          </Field>
+          <Field label="Situação">
+            <Select value={form.status} onChange={(e) => update("status", e.target.value as FormState["status"])}>
+              {STATUS_OPTIONS.map((key) => (
+                <option key={key} value={key}>
+                  {STATUS_LABELS[key]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Endereço">
+            <Input
+              value={form.address}
+              onChange={(e) => update("address", e.target.value)}
+              placeholder="Av. Paulista"
+              maxLength={255}
+            />
+          </Field>
+          <Field label="Número">
+            <Input
+              value={form.number}
+              onChange={(e) => update("number", e.target.value)}
+              placeholder="1200"
+              maxLength={20}
+            />
+          </Field>
+          <Field label="CEP">
+            <Input
+              value={form.zipCode}
+              onChange={(e) => update("zipCode", e.target.value)}
+              placeholder="01310-100"
+              maxLength={12}
+            />
+          </Field>
+          <Field label="Bairro">
+            <Input
+              value={form.neighborhood}
+              onChange={(e) => update("neighborhood", e.target.value)}
+              placeholder="Jardins"
             />
           </Field>
           <Field label="Cidade">
@@ -213,11 +319,20 @@ export function FormDialog({
               maxLength={2}
             />
           </Field>
-          <Field label="Bairro">
+          <Field label="Latitude" hint="opcional">
             <Input
-              value={form.neighborhood}
-              onChange={(e) => update("neighborhood", e.target.value)}
-              placeholder="Jardins"
+              inputMode="decimal"
+              value={form.latitude}
+              onChange={(e) => update("latitude", e.target.value)}
+              placeholder="-23.5614"
+            />
+          </Field>
+          <Field label="Longitude" hint="opcional">
+            <Input
+              inputMode="decimal"
+              value={form.longitude}
+              onChange={(e) => update("longitude", e.target.value)}
+              placeholder="-46.6559"
             />
           </Field>
           <Field label="Área (m²)">
@@ -226,6 +341,38 @@ export function FormDialog({
               value={form.area}
               onChange={(e) => update("area", e.target.value)}
               placeholder="120"
+            />
+          </Field>
+          <Field label="Dormitórios">
+            <Input
+              inputMode="numeric"
+              value={form.bedrooms}
+              onChange={(e) => update("bedrooms", e.target.value)}
+              placeholder="3"
+            />
+          </Field>
+          <Field label="Suítes">
+            <Input
+              inputMode="numeric"
+              value={form.suites}
+              onChange={(e) => update("suites", e.target.value)}
+              placeholder="2"
+            />
+          </Field>
+          <Field label="Banheiros">
+            <Input
+              inputMode="numeric"
+              value={form.bathrooms}
+              onChange={(e) => update("bathrooms", e.target.value)}
+              placeholder="2"
+            />
+          </Field>
+          <Field label="Vagas de garagem">
+            <Input
+              inputMode="numeric"
+              value={form.parkingSpots}
+              onChange={(e) => update("parkingSpots", e.target.value)}
+              placeholder="2"
             />
           </Field>
           <Field label="Finalidade">
@@ -246,15 +393,6 @@ export function FormDialog({
               ))}
             </Select>
           </Field>
-          <Field label="Situação">
-            <Select value={form.status} onChange={(e) => update("status", e.target.value as FormState["status"])}>
-              {STATUS_OPTIONS.map((key) => (
-                <option key={key} value={key}>
-                  {STATUS_LABELS[key]}
-                </option>
-              ))}
-            </Select>
-          </Field>
           <Field label="Preço de venda (R$)">
             <Input
               inputMode="decimal"
@@ -269,6 +407,22 @@ export function FormDialog({
               value={form.rentPrice}
               onChange={(e) => update("rentPrice", e.target.value)}
               placeholder="4500"
+            />
+          </Field>
+          <Field label="Condomínio (R$/mês)">
+            <Input
+              inputMode="decimal"
+              value={form.condoFee}
+              onChange={(e) => update("condoFee", e.target.value)}
+              placeholder="900"
+            />
+          </Field>
+          <Field label="IPTU (R$/ano)">
+            <Input
+              inputMode="decimal"
+              value={form.propertyTax}
+              onChange={(e) => update("propertyTax", e.target.value)}
+              placeholder="3600"
             />
           </Field>
           <Field label="Descrição" className="sm:col-span-2">
@@ -298,6 +452,15 @@ export function FormDialog({
                 className="h-4 w-4 rounded border-ink-700 bg-ink-950 accent-brand-500"
               />
               Destaque
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-200">
+              <input
+                type="checkbox"
+                checked={form.isFurnished}
+                onChange={(e) => update("isFurnished", e.target.checked)}
+                className="h-4 w-4 rounded border-ink-700 bg-ink-950 accent-brand-500"
+              />
+              Mobiliado
             </label>
           </div>
         </div>

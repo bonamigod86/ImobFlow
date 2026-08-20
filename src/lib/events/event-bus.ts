@@ -48,6 +48,12 @@ export interface DomainEventMap {
     propertyId: string;
     mediaId: string;
   };
+  "property.media_primary": {
+    tenantId: string;
+    userId: string | null;
+    propertyId: string;
+    mediaId: string;
+  };
   "integration.failed": {
     tenantId: string | null;
     integrationId: string;

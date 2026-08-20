@@ -47,8 +47,9 @@ export default function DashboardView({ user, tenant, actions }: DashboardViewPr
   const { slug: clientSlug, role: clientRole } = useTenant();
   const [load, setLoad] = useState<LoadStatus>({ status: "loading" });
 
-  const canCreate = actions.includes("properties:create");
-  const canDelete = actions.includes("properties:delete");
+const canCreate = actions.includes("properties:create");
+const canUpdate = actions.includes("properties:update");
+const canDelete = actions.includes("properties:delete");
 
   const refresh = useCallback(async () => {
     if (!tenant) return;
@@ -169,6 +170,7 @@ export default function DashboardView({ user, tenant, actions }: DashboardViewPr
               total={load.status === "ready" ? load.total : 0}
               loading={load.status === "loading"}
               canCreate={canCreate}
+              canUpdate={canUpdate}
               canDelete={canDelete}
               onChanged={() => void refresh()}
             />

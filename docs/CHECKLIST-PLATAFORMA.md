@@ -116,6 +116,77 @@ corrigidas e o fluxo foi testado via HTTP (KPIs com dados reais de demo).
 
 ---
 
+## Item 5 — Gestão de imóveis (CRUD completo)
+
+Status: **100% implementado**. Divergências identificadas na auditoria foram
+corrigidas e o fluxo foi testado via HTTP (CRUD completo, ciclo de vida e
+galeria de mídia).
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 5.1 | Cadastro de imóvel com código e referência interna | OK | `POST /api/properties` + `FormDialog` (código + código externo) |
+| 5.2 | Finalidade (venda/aluguel/ambos) e tipo/categoria | OK | `target`/`category` no schema de formulário e na validação (`propertySchema`) |
+| 5.3 | Situação (ativo, inativo, vendido, alugado) | OK | Enum `PropertyStatus` + ações de menu e `/status` |
+| 5.4 | Endereço completo, CEP e coordenadas | OK | Campos `address`, `number`, `city`, `state`, `neighborhood`, `zipCode`, `latitude`, `longitude` no formulário e na API |
+| 5.5 | Preços de venda/aluguel, condomínio e IPTU | OK | `salePrice`, `rentPrice`, `condoFee`, `propertyTax` (Decimal) |
+| 5.6 | Área, dormitórios, suítes, banheiros, vagas | OK | Campos numéricos no formulário e no grid de detalhes |
+| 5.7 | Características (mobiliado, etc.) | OK | `isFurnished` (checkbox) + `isFeatured`/`isActive` no mesmo formulário |
+| 5.8 | Imagens e vídeos (galeria) | OK | `MediaManagerDialog` (upload, lista, remoção) — caminho presigned (S3) e fallback local `/api/media/[id]/bytes` |
+| 5.9 | Definir imagem principal | OK | `PATCH /api/media/[mediaId]/primary` (nova rota) + estrela no gerenciador |
+| 5.10 | Destaques | OK | `PATCH /api/properties/[id]/featured` + menu "Destacar/Remover destaque" |
+| 5.11 | Editar imóvel | OK | `PATCH /api/properties/[id]` + `FormDialog` preenchido com todos os campos |
+| 5.12 | Duplicar imóvel | OK | `POST /api/properties/[id]/duplicate` + menu "Duplicar" (novo código, `externalCode` zerado, flags resetados) |
+| 5.13 | Ativar/desativar (publicar/ocultar) | OK | `PATCH /status` `{ isActive }` (soft delete/restore) + badge "Oculto" |
+| 5.14 | Vender/alugar (situação) | OK | `PATCH /status` `{ status: SOLD | RENTED }` + itens de menu condicionais |
+| 5.15 | Excluir imóvel | OK | `DELETE /api/properties/[id]` (com confirmação; remove mídia em cascata) |
+
+### Testes manuais realizados (via HTTP)
+
+1. `POST /api/properties` com todos os campos (código externo, endereço, CEP,
+   coordenadas, condomínio, IPTU, cômodos, mobiliado) → **201**; `GET` refletiu
+   os dados.
+2. `PATCH /api/properties/[id]` → atualização de título/IPTU **200** (slug/`searchText` recalculados).
+3. `PATCH /api/properties/[id]/featured` `{ featured: true }` → `isFeatured: true`.
+4. `PATCH /api/properties/[id]/status` `{ status: "SOLD" }` → `SOLD`;
+   `{ isActive: false }` → `INACTIVE` (oculto) e `{ isActive: true }` → restaurado.
+5. `POST /api/properties/[id]/duplicate` → **201**, novo código `AUD5-001-01`,
+   `externalCode: null`, `isFeatured: false`, `isActive: true`.
+6. Galeria de mídia local: `POST …/media` (registro) → `POST /api/media/[id]/bytes`
+   (armazenou) → media `READY` com `url` interna → `GET …/bytes` **200** com bytes
+   corretos → `PATCH /api/media/[id]/primary` → `isPrimary: true` no `GET` do imóvel.
+7. `DELETE /api/properties/[id]` → **200**; media removida (bytes → **404** após).
+
+---
+
+## Correções aplicadas após a auditoria (Item 5)
+
+1. **Duplicar conflitava no `externalCode`** — `duplicateProperty` copiava o
+   `externalCode` da origem, violando `@@unique([tenantId, externalCode])` (P2002).
+   Agora a cópia começa com `externalCode: null` e código novo (sufixo `-NN`).
+2. **Sem rota de "imagem principal"** — `setPrimaryMedia` existia no serviço, mas
+   nenhum endpoint expunha; criado `PATCH /api/media/[mediaId]/primary` (com evento
+   `property.media_primary` no barramento).
+3. **Galeria não funcionava em dev local** — sem S3 configurado, o upload
+   presignado é inviável e o worker (processo separado) não vê o objeto. Criado
+   `GET/POST /api/media/[mediaId]/bytes`: `registerUpload` só enfileira o job de
+   transcodificação quando há armazenamento real; no modo local o navegador envia
+   os bytes ao servidor e a linha é finalizada READY com `url` interna.
+4. **Relativo não renderizava em `<img>`** — `PropertyThumb` aceita apenas CDN
+   HTTPS; passou a renderizar URLs relativas (bytes route) com `<img>` simples
+   (o otimizador next/image perderia o cookie da sessão).
+5. **Formulário incompleto** — faltavam código externo, endereço, número, CEP,
+   coordenadas, condomínio, IPTU, dormitórios, suítes, banheiros, vagas e
+   mobiliado; todos adicionados ao `FormDialog` (com parse de inteiros).
+6. **Ações de ciclo de vida ausentes na tabela** — menu de linha ganhou
+   Duplicar, Destacar/Remover destaque, Publicar/Ocultar, Marcar vendido e
+   Marcar alugado (gate por permissão `properties:update`).
+7. **Gerenciador de mídia inexistente** — novo `MediaManagerDialog` (adicionar
+   imagem/vídeo, remover, definir capa) na ação "Fotos e vídeos".
+8. **`PropertyRow` sem campos novos** — adicionados `zipCode`, `latitude`,
+   `longitude`, `isFurnished` e o tipo `PropertyMediaRow`.
+
+---
+
 ## Correções aplicadas após a auditoria (Item 4)
 
 1. **Visualizações não fluíam do portal** — o PDP público não registrava
@@ -186,3 +257,5 @@ corrigidas e o fluxo foi testado via HTTP (KPIs com dados reais de demo).
 - Testes de segregação de dados (tenant A nunca lê dados de B) — verdes,
   incluindo as rotas públicas de itens 3 e 4
 - Seed demo: KPIs do painel populados (views, visitas, WhatsApp) de forma idempotente
+- Item 5 (imóveis): CRUD completo, duplicar, publicar/ocultar, vender/alugar,
+  destaque e galeria de mídia (com fallback local) validados via HTTP

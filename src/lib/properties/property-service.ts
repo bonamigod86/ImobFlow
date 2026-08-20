@@ -55,7 +55,16 @@ export async function duplicateProperty(id: string, overrides: { title?: string 
     });
   }
 
-  const { id: _sourceId, createdAt: _createdAt, updatedAt: _updatedAt, slug: _oldSlug, isFeatured, isActive, ...base } = source;
+  const {
+    id: _sourceId,
+    externalCode: _externalCode,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    slug: _oldSlug,
+    isFeatured,
+    isActive,
+    ...base
+  } = source;
   const newCode = await nextAvailableCode(source.tenantId, source.code);
   const title = overrides.title ?? `${source.title} (cópia)`;
   const publicIdentity = await withPublicIdentity({ ...source, title, code: newCode });
@@ -64,6 +73,9 @@ export async function duplicateProperty(id: string, overrides: { title?: string 
     data: {
       ...base,
       code: newCode,
+      // Fresh copy: the external reference is tenant-unique, so it never
+      // carries over — the new listing starts without one.
+      externalCode: null,
       title,
       isFeatured: false,
       isActive: true,
@@ -72,7 +84,7 @@ export async function duplicateProperty(id: string, overrides: { title?: string 
     include: { media: { orderBy: { sortOrder: "asc" }, take: 1 } },
   });
 
-  return { property, changed: ["code", "isFeatured", "isActive", "slug", "searchText"] };
+  return { property, changed: ["code", "externalCode", "isFeatured", "isActive", "slug", "searchText"] };
 }
 
 /** Persist a status transition (ACTIVE/INACTIVE/SOLD/RENTED). */

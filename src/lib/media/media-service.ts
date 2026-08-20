@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
-import { storage, publicUrlForKey } from "@/lib/storage/storage";
+import { storage, publicUrlForKey, hasRealStorage } from "@/lib/storage/storage";
 import { QueueManager } from "@/lib/queues/queue-manager";
 import { requireTenantId } from "@/lib/tenant/context";
 
@@ -46,14 +46,37 @@ export async function registerUpload(input: {
     expiresInSeconds: EXPIRES_DEFAULT_S,
   });
 
-  await QueueManager.addMediaProcessing({
-    tenantId,
-    mediaId: media.id,
-    propertyId: input.propertyId,
-    sourceKey: objectKey,
-  });
+  // Real object storage: the client streams bytes to the presigned URL and the
+  // processing queue validates/transcodes asynchronously. Local fallback has no
+  // shared object store and no presigned host, so no job is enqueued — the
+  // server-side bytes route stores and finalizes the row synchronously instead.
+  if (hasRealStorage) {
+    await QueueManager.addMediaProcessing({
+      tenantId,
+      mediaId: media.id,
+      propertyId: input.propertyId,
+      sourceKey: objectKey,
+    });
+  }
 
   return { mediaId: media.id, uploadUrl, objectKey };
+}
+
+/**
+ * Local/dev friendly finalize: stores the raw bytes server-side and marks the
+ * row READY with an in-app URL, bypassing the offline transcoding pipeline
+ * (which needs a real object store + worker process).
+ */
+export async function finalizeLocalMedia(mediaId: string, objectKey: string, bytes: Buffer): Promise<void> {
+  await storage.put(objectKey, bytes);
+  await prisma.propertyMedia.update({
+    where: { id: mediaId },
+    data: {
+      status: "READY",
+      url: `/api/media/${mediaId}/bytes`,
+      sizeBytes: bytes.length,
+    },
+  });
 }
 
 /** Reorder the gallery (array of media ids in desired display order). */

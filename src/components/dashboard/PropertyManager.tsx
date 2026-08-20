@@ -1,7 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Pencil, Plus, MoreHorizontal, Trash2 } from "lucide-react";
+import {
+  BadgeCheck,
+  CalendarCheck,
+  Copy,
+  Eye,
+  EyeOff,
+  Images,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Star,
+  StarOff,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +52,7 @@ interface PropertyManagerProps {
   loading: boolean;
   total: number;
   canCreate: boolean;
+  canUpdate: boolean;
   canDelete: boolean;
   onChanged: () => void;
 }
@@ -47,10 +62,66 @@ export function PropertyManager({
   loading,
   total,
   canCreate,
+  canUpdate,
   canDelete,
   onChanged,
 }: PropertyManagerProps) {
   const [action, setAction] = useState<PropertyAction | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function runLifecycle(property: PropertyRow, request: () => Promise<Response>, failMessage: string) {
+    setActionError(null);
+    setBusyId(property.id);
+    try {
+      const res = await request();
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.message ?? failMessage);
+      onChanged();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : failMessage);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const lifecycle = (property: PropertyRow) => ({
+    duplicate: () =>
+      runLifecycle(property, () => fetch(`/api/properties/${property.id}/duplicate`, { method: "POST" }), "Falha ao duplicar o imóvel."),
+    toggleActive: () =>
+      runLifecycle(
+        property,
+        () =>
+          fetch(`/api/properties/${property.id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isActive: !property.isActive }),
+          }),
+        "Falha ao alterar a publicação.",
+      ),
+    setStatus: (status: "SOLD" | "RENTED") =>
+      runLifecycle(
+        property,
+        () =>
+          fetch(`/api/properties/${property.id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status }),
+          }),
+        "Falha ao marcar o status.",
+      ),
+    toggleFeatured: () =>
+      runLifecycle(
+        property,
+        () =>
+          fetch(`/api/properties/${property.id}/featured`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ featured: !property.isFeatured }),
+          }),
+        "Falha ao alterar o destaque.",
+      ),
+  });
 
   return (
     <Card className="lg:col-span-2">
@@ -69,14 +140,12 @@ export function PropertyManager({
         )}
       </CardHeader>
       <CardContent>
-        {loading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10" />
-            <Skeleton className="h-12" />
-            <Skeleton className="h-12" />
-            <Skeleton className="h-12" />
-          </div>
-        ) : rows.length === 0 ? (
+        {actionError && (
+          <p className="mb-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            {actionError}
+          </p>
+        )}
+        {rows.length === 0 && !loading ? (
           <div className="rounded-lg border border-dashed border-ink-700 px-4 py-10 text-center">
             <p className="text-sm text-ink-300">Nenhum imóvel cadastrado ainda.</p>
             {canCreate && (
@@ -85,6 +154,13 @@ export function PropertyManager({
                 Cadastrar primeiro imóvel
               </Button>
             )}
+          </div>
+        ) : loading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10" />
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
           </div>
         ) : (
           <Table>
@@ -102,6 +178,8 @@ export function PropertyManager({
             <TableBody>
               {rows.map((property) => {
                 const price = priceForRow(property);
+                const actions = lifecycle(property);
+                const busy = busyId === property.id;
                 return (
                   <TableRow key={property.id}>
                     <TableCell>
@@ -134,12 +212,15 @@ export function PropertyManager({
                       <Badge variant={STATUS_BADGE_VARIANTS[property.status]}>
                         {STATUS_LABELS[property.status]}
                       </Badge>
+                      {!property.isActive && (
+                        <Badge variant="outline" className="ml-1.5">Oculto</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-sm" aria-label={`Ações para ${property.title}`}>
-                            <MoreHorizontal className="h-4 w-4" />
+                          <Button variant="ghost" size="icon-sm" aria-label={`Ações para ${property.title}`} disabled={busy}>
+                            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -147,10 +228,56 @@ export function PropertyManager({
                             <Eye />
                             Ver detalhes
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => setAction({ kind: "edit", property })}>
-                            <Pencil />
-                            Editar
-                          </DropdownMenuItem>
+                          {canUpdate && (
+                            <>
+                              <DropdownMenuItem onSelect={() => setAction({ kind: "edit", property })}>
+                                <Pencil />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => void actions.duplicate()}>
+                                <Copy />
+                                Duplicar
+                              </DropdownMenuItem>
+                              {property.isFeatured ? (
+                                <DropdownMenuItem onSelect={() => void actions.toggleFeatured()}>
+                                  <StarOff />
+                                  Remover destaque
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onSelect={() => void actions.toggleFeatured()}>
+                                  <Star />
+                                  Destacar
+                                </DropdownMenuItem>
+                              )}
+                              {property.isActive ? (
+                                <DropdownMenuItem onSelect={() => void actions.toggleActive()}>
+                                  <EyeOff />
+                                  Desativar (ocultar)
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onSelect={() => void actions.toggleActive()}>
+                                  <Eye />
+                                  Ativar (publicar)
+                                </DropdownMenuItem>
+                              )}
+                              {property.status !== "SOLD" && (
+                                <DropdownMenuItem onSelect={() => void actions.setStatus("SOLD")}>
+                                  <BadgeCheck />
+                                  Marcar vendido
+                                </DropdownMenuItem>
+                              )}
+                              {property.status !== "RENTED" && (
+                                <DropdownMenuItem onSelect={() => void actions.setStatus("RENTED")}>
+                                  <CalendarCheck />
+                                  Marcar alugado
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem onSelect={() => setAction({ kind: "media", property })}>
+                                <Images />
+                                Fotos e vídeos
+                              </DropdownMenuItem>
+                            </>
+                          )}
                           {canDelete && (
                             <>
                               <DropdownMenuSeparator />

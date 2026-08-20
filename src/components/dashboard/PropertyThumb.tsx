@@ -8,6 +8,7 @@ const ALLOWED_IMAGE_HOSTS = new Set(["cdn.tenant-media.example.com"]);
 
 function isAllowedUrl(url: string | null | undefined): boolean {
   if (!url) return false;
+  if (url.startsWith("/")) return true;
   try {
     const parsed = new URL(url);
     return parsed.protocol === "https:" && ALLOWED_IMAGE_HOSTS.has(parsed.hostname);
@@ -44,6 +45,20 @@ export function PropertyThumb({
         aria-label={title}
       >
         <Building2 className="h-5 w-5 text-white/85" />
+      </div>
+    );
+  }
+  // Same-origin routes (local /api/media/[id]/bytes) must use a plain <img> —
+  // the next/image optimizer would fetch server-side and lose the session cookie.
+  if (url?.startsWith("/")) {
+    return (
+      <div className={cn(base, "relative")}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl}
+          alt={CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS] ?? title}
+          className="h-full w-full object-cover"
+        />
       </div>
     );
   }
