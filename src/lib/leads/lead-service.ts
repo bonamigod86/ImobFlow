@@ -50,6 +50,8 @@ export interface RealEstateLeadInput {
   schedule?: { date?: string; time?: string } | null;
   /** "form" — filled intake form; "whatsapp" — visitor opened the wa.me CTA. */
   channel?: "form" | "whatsapp";
+  /** CTA intent captured on the portal (one of the 7 CTA labels). */
+  interestType?: string | null;
   utm: Record<string, string>;
   consentTextVersion: string;
   client: ClientMeta;
@@ -57,16 +59,18 @@ export interface RealEstateLeadInput {
 
 export interface FinancialLeadInput {
   name: string;
-  email: string;
+  email?: string | null;
   phone: string;
-  propertyValue: number;
-  downPayment: number;
+  message?: string | null;
+  interestType?: string | null;
+  propertyValue?: number | null;
+  downPayment?: number | null;
   financingAmount?: number | null;
-  monthlyIncome: number;
-  monthlyInstallmentLimit: number;
-  termMonths: number;
-  city: string;
-  state: string;
+  monthlyIncome?: number | null;
+  monthlyInstallmentLimit?: number | null;
+  termMonths?: number | null;
+  city?: string | null;
+  state?: string | null;
   tenantSlug?: string | null;
   propertyId?: string | null;
   utm: Record<string, string>;
@@ -101,16 +105,88 @@ async function resolveVisibleProperty(propertyId: string) {
       title: true,
       city: true,
       state: true,
+      neighborhood: true,
       target: true,
       slug: true,
       salePrice: true,
       rentPrice: true,
+      tenant: { select: { name: true } },
     },
   });
   if (!property) {
     throw new AppError(404, "NOT_FOUND", "Imóvel não encontrado.");
   }
   return property;
+}
+
+/** Attributed broker for a tenant (first active owner/manager/agent) — mirrors
+ *  the public repository so the lead snapshot matches the PDP. */
+async function attributedBrokerFor(tenantId: string) {
+  return prismaUnscoped.user.findFirst({
+    where: { tenantId, isActive: true, role: { in: ["OWNER", "MANAGER", "AGENT"] } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, email: true, phone: true },
+  });
+}
+
+/**
+ * Immutable context snapshot captured at submission time (satisfies the lead
+ * field contract: código, valor, cidade, imobiliária, corretor — "quando
+ * disponível"). Kept in `payload` even if the listing is later edited/deleted.
+ */
+async function propertySnapshot(property: {
+  id: string;
+  tenantId: string;
+  code: string;
+  title: string;
+  city: string | null;
+  state: string | null;
+  neighborhood: string | null;
+  target: string;
+  salePrice: { toString(): string } | null;
+  rentPrice: { toString(): string } | null;
+  tenant: { name: string } | null;
+}) {
+  const broker = await attributedBrokerFor(property.tenantId);
+  const salePrice =
+    property.salePrice == null ? null : Number(property.salePrice.toString());
+  const rentPrice =
+    property.rentPrice == null ? null : Number(property.rentPrice.toString());
+  return {
+    id: property.id,
+    code: property.code,
+    title: property.title,
+    city: property.city,
+    state: property.state,
+    neighborhood: property.neighborhood,
+    target: property.target,
+    salePrice,
+    rentPrice,
+    value: property.target === "RENT" ? rentPrice : salePrice,
+    estateName: property.tenant?.name ?? null,
+    broker: broker
+      ? { id: broker.id, name: broker.name, email: broker.email, phone: broker.phone }
+      : null,
+  };
+}
+
+function captureMeta(input: { utm: Record<string, string>; interestType?: string | null }) {
+  return {
+    utm: Object.keys(input.utm).length > 0 ? input.utm : undefined,
+    interestType: input.interestType ?? undefined,
+    capturedAt: new Date().toISOString(),
+  };
+}
+
+/** Numeric reference value of a listed property (SALE → salePrice, else rent). */
+function propertySnapshotValue(property: {
+  target: string;
+  salePrice: { toString(): string } | null;
+  rentPrice: { toString(): string } | null;
+}): number | null {
+  const raw =
+    property.target === "RENT" ? property.rentPrice : property.salePrice;
+  return raw == null ? null : Number(raw.toString());
 }
 
 /** Active endpoint list a REAL_ESTATE lead may be dispatched to (tenant-owned
@@ -131,11 +207,11 @@ async function resolveRealEstateEndpoints(tenantId: string) {
 async function resolveFinancialEndpoint(
   tenantId: string,
   profile: {
-    city: string;
-    state: string;
-    monthlyIncome: number;
-    propertyValue: number;
-    termMonths: number;
+    city: string | null;
+    state: string | null;
+    monthlyIncome: number | null;
+    propertyValue: number | null;
+    termMonths: number | null;
   },
 ): Promise<{ endpoint: { id: string; name: string } | null; rule: RoutingCandidate | null }> {
   const rules = await prismaUnscoped.routingRule.findMany({
@@ -278,9 +354,11 @@ export async function captureRealEstateLead(input: RealEstateLeadInput): Promise
       status: "NEW",
       payload: {
         property: { id: property.id, code: property.code, title: property.title },
+        propertySnapshot: await propertySnapshot(property),
         message: input.message ?? null,
         source: "portal",
         channel,
+        ...captureMeta(input),
         ...utm,
         ...schedule,
       },
@@ -334,11 +412,7 @@ export async function captureRealEstateLead(input: RealEstateLeadInput): Promise
   // for an appointment (schedule present in the captured payload).
   const capturedPayload = (lead.payload ?? {}) as Record<string, unknown>;
   const capturedSchedule = asRecord(capturedPayload.schedule);
-  const tenantName =
-    (await prismaUnscoped.tenant.findUnique({
-      where: { id: property.tenantId },
-      select: { name: true },
-    }))?.name ?? "";
+  const tenantName = property.tenant?.name ?? "";
   const leadMeta = {
     tenantName,
     leadName: lead.name,
@@ -374,8 +448,9 @@ export async function captureFinancialLead(input: FinancialLeadInput): Promise<L
   // Multi-tenant scoping: derive the owning tenant from a listing or slug. A
   // financial lead is NEVER tenant-less (isolation by construction).
   let tenantId: string | null = null;
+  let property: Awaited<ReturnType<typeof resolveVisibleProperty>> | null = null;
   if (input.propertyId) {
-    const property = await resolveVisibleProperty(input.propertyId);
+    property = await resolveVisibleProperty(input.propertyId);
     tenantId = property.tenantId;
   } else if (input.tenantSlug) {
     const tenant = await prismaUnscoped.tenant.findFirst({
@@ -392,8 +467,16 @@ export async function captureFinancialLead(input: FinancialLeadInput): Promise<L
     );
   }
 
+  // Light capture: the broker/buyer may complete the profile later. Derive the
+  // target value/geo from the listing when the fields were left blank.
+  const propertyValue = input.propertyValue ?? (property && propertySnapshotValue(property));
+  const downPayment = input.downPayment ?? null;
   const financingAmount =
-    input.financingAmount ?? Math.max(0, input.propertyValue - input.downPayment);
+    input.financingAmount ??
+    (propertyValue != null && downPayment != null
+      ? Math.max(0, propertyValue - downPayment)
+      : null);
+  const snapshot = property ? await propertySnapshot(property) : null;
 
   const lead = await prismaUnscoped.lead.create({
     data: {
@@ -402,20 +485,25 @@ export async function captureFinancialLead(input: FinancialLeadInput): Promise<L
       origin: "SITE_FORM",
       status: "NEW",
       name: input.name,
-      email: input.email,
+      email: input.email || null,
       phone: input.phone,
-      payload: { utm: input.utm, source: "portal-financing" },
+      payload: {
+        source: "portal-financing",
+        ...captureMeta(input),
+        message: input.message ?? null,
+        ...(snapshot ? { propertySnapshot: snapshot } : {}),
+      },
       financeProfile: {
         create: {
           tenantId,
-          propertyValue: input.propertyValue,
-          downPayment: input.downPayment,
+          propertyValue,
+          downPayment,
           financingAmount,
-          monthlyIncome: input.monthlyIncome,
-          monthlyInstallmentLimit: input.monthlyInstallmentLimit,
-          termMonths: input.termMonths,
-          city: input.city,
-          state: input.state,
+          monthlyIncome: input.monthlyIncome ?? null,
+          monthlyInstallmentLimit: input.monthlyInstallmentLimit ?? null,
+          termMonths: input.termMonths ?? null,
+          city: input.city ?? property?.city ?? null,
+          state: input.state ?? property?.state ?? null,
         },
       },
     },
@@ -434,11 +522,11 @@ export async function captureFinancialLead(input: FinancialLeadInput): Promise<L
   // External dispatch — first matching routing rule wins (tenant rules first,
   // then platform defaults). No match => the lead stays internal.
   const { endpoint, rule } = await resolveFinancialEndpoint(tenantId, {
-    city: input.city,
-    state: input.state,
-    monthlyIncome: input.monthlyIncome,
-    propertyValue: input.propertyValue,
-    termMonths: input.termMonths,
+    city: input.city ?? property?.city ?? null,
+    state: input.state ?? property?.state ?? null,
+    monthlyIncome: input.monthlyIncome ?? null,
+    propertyValue,
+    termMonths: input.termMonths ?? null,
   });
 
   const deliveries: DispatchResult[] = [];

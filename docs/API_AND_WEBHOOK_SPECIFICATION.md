@@ -96,9 +96,11 @@ Códigos comuns: `UNAUTHORIZED` (401), `FORBIDDEN` (403), `VALIDATION_ERROR`
   "email": "marcos@example.com",
   "phone": "+5511999990000",
   "message": "Tenho interesse",
+  "channel": "form",
+  "interestType": "tenho_interesse",
   "schedule": { "date": "2026-08-22", "time": "14:00" },
   "utm": { "source": "google", "campaign": "launch" },
-  "consent": { "textVersion": "2026-08-19.v1" }
+  "consent": { "granted": true, "textVersion": "2026-08-19.v1" }
 }
 ```
 - Endpoint **cross-tenant**: o tenant dono é derivado do imóvel.
@@ -106,6 +108,26 @@ Códigos comuns: `UNAUTHORIZED` (401), `FORBIDDEN` (403), `VALIDATION_ERROR`
   gravados pelo servidor.
 - Dispara e-mails transacionais ao OWNER (`new_lead_alert` e, se houver
   `schedule`, `visit_request`).
+- `interestType` preserva o CTA de origem (`tenho_interesse | agendar_visita |
+  falar_anunciante | saber_mais | financiamento | alternativas_aquisicao |
+  simulacao`). O portal PDP expõe todos os 7 CTAs e anexa os UTM da URL.
+- O payload captura o **snapshot do imóvel** (`propertySnapshot`: código, valor,
+  cidade, imobiliária e corretor atribuído) no momento da submissão — "quando
+  disponível" — além de `capturedAt`. Canal `whatsapp` é anônimo (sem PII).
+
+`POST /api/public/financial-leads` (captura também leve — preencher o perfil
+financeiro é opcional; valor/cidade são derivados do imóvel quando ausentes):
+```json
+{
+  "propertyId": "p1",
+  "name": "Camila Rocha",
+  "phone": "+5511988887777",
+  "interestType": "simulacao",
+  "monthlyIncome": 18000,
+  "utm": { "source": "instagram" },
+  "consent": { "granted": true, "textVersion": "2026-08-19.v1" }
+}
+```
 
 ### 2.4 Imóveis
 
@@ -138,12 +160,22 @@ Códigos comuns: `UNAUTHORIZED` (401), `FORBIDDEN` (403), `VALIDATION_ERROR`
 { "orderedIds": ["m1", "m2"], "primaryId": "m2" }
 ```
 
-### 2.5 Leads
+### 2.5 Leads (geração e qualificação)
 
-| Método | Rota | Ação | Descrição |
+| Método | Rota | Ação RBAC | Descrição |
 | --- | --- | --- | --- |
 | GET/POST | `/api/leads` | `leads:read` / `leads:create` | listar/criar (painel) |
+| GET | `/api/leads/{id}` | `leads:read` | detalhe: payload completo, consent, perfil financeiro, entregas |
+| PATCH | `/api/leads/{id}` | `leads:update` | **qualificar**: `status` (`NEW→CONTACTED/QUALIFIED/PROPOSAL_SENT/NEGOTIATION/WON/LOST`), `note`, `assignedToId` (exige `leads:assign`) |
+| DELETE | `/api/leads/{id}` | `leads:delete` | remover lead (cascade consent/entregas) |
 | — | roteamento | `leads:route` | regras de roteamento p/ CRMs (ver §3) |
+
+**Contrato de campos do lead** (gravado na captura/"quando disponível"): nome,
+telefone, e-mail, imóvel (`property.id`/`code`), valor, cidade, imobiliária,
+corretor, origem, data/hora (`createdAt`/`capturedAt`), UTM/campanha, tipo de
+interesse (`interestType`), mensagem e consentimentos (LGPD 1:1). Os campos
+derivados do anúncio ficam em `payload.propertySnapshot` — imutáveis mesmo se o
+imóvel for editado/excluído depois.
 
 ### 2.6 Importação e sincronização de imóveis
 
@@ -249,8 +281,9 @@ APT-101,Apto Centro,São Paulo,SP,RENT,3900,85,2
 
 ### 3.1 Modelo
 
-- **WebhookEndpoint**: URL, `scope` (`REAL_ESTATE` | `PLATFORM`), `strategy`
-  (`PUSH` | `PULL` | `MANUAL`), segredo de assinatura, `timeoutMs`, retries.
+- **WebhookEndpoint**: URL, `scope` (`REAL_ESTATE` | `FINANCIAL`), `strategy`
+  (`CUSTOM_JSON` | `FINANCE_DEFAULT` | `CRM_DEFAULT`), segredo de assinatura,
+  `timeoutMs`, retries.
 - **RoutingRule**: condições (tipo de lead, origem, cidade, ...) + endpoint
   alvo + prioridade.
 - **WebhookDelivery**: entrega de um payload (lead) p/ um endpoint.

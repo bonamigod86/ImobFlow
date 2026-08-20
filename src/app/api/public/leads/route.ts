@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
       message: body.message ?? null,
       schedule: body.schedule ?? null,
       channel: body.channel,
+      interestType: body.interestType ?? null,
       utm: body.utm,
       consentTextVersion: body.consent.textVersion,
       client: {

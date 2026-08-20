@@ -218,6 +218,80 @@ corrigidas (detalhes na seção "Correções" ao final).
 
 ---
 
+## Item 7 — Geração e qualificação de leads
+
+Status: **100% implementado**. Divergências identificadas na auditoria foram
+corrigidas (detalhes na seção "Correções" ao final).
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 7.1 | CTAs de geração no imóvel | OK | `src/components/portal/ContactModal.tsx` expõe os 7 CTAs no PDP |
+| 7.2 | CTA "tenho interesse neste imóvel" | OK | Formulário → `POST /api/public/leads`, `interestType: tenho_interesse` |
+| 7.3 | CTA "quero agendar visita" | OK | Formulário com data/horário → `schedule` + e-mail `visit_request` |
+| 7.4 | CTA "falar com o anunciante" | OK | Deep-link `wa.me` + captura anônima `channel: whatsapp`, `interestType: falar_anunciante` |
+| 7.5 | CTA "quero saber mais" | OK | Formulário → lead com mensagem do visitante |
+| 7.6 | CTA "avaliar opções de financiamento" | OK | Captura financeira leve → `interestType: financiamento` |
+| 7.7 | CTA "conhecer alternativas para aquisição" | OK | Captura financeira leve → `interestType: alternativas_aquisicao` |
+| 7.8 | CTA "receber uma simulação" | OK | Captura financeira leve → `interestType: simulacao` |
+| 7.9 | Campos do lead (quando disponível) | OK | nome, telefone, e-mail, imóvel/código, **valor**, **cidade**, **imobiliária**, **corretor**, origem, **data/hora**, **UTM/campanha**, **tipo de interesse**, mensagem, consentimentos — em `payload` + `LeadConsent` 1:1 (ver 7.10) |
+| 7.10 | Snapshot imutável do anúncio | OK | `payload.propertySnapshot` (código, valor, cidade, imobiliária, corretor) capturado na submissão |
+| 7.11 | UTM/campanha | OK | `utm` aceito via API e **anexado pelo portal** (lido da URL) |
+| 7.12 | Qualificação (funil) | OK | `GET/PATCH/DELETE /api/leads/{id}`: status `NEW→CONTACTED/QUALIFIED/PROPOSAL_SENT/NEGOTIATION/WON/LOST`, `note`, `assignedToId` (exige `leads:assign`) |
+| 7.13 | Roteamento/qualificação | OK | Worker `lead-routing-queue` agenda OWNER + tier hot/warm/cold; financeiro → parceiro via `RoutingRule`; e-mails `new_lead_alert`/`visit_request` |
+| 7.14 | Observabilidade de geração | OK | KPIs do painel: funil de leads, visitas solicitadas, WhatsApp, ranking "Geração de leads" |
+
+### Testes manuais realizados (via HTTP)
+
+1. **7 CTAs**: `POST /api/public/leads` com `interestType`
+   tenho_interesse/saber_mais/agendar_visita/falar_anunciante e
+   `/api/public/financial-leads` com financiamento/alternativas_aquisicao/
+   simulacao → **201** em todos; `type` e `interestType` gravados.
+2. **Campos**: o lead persistido contém `propertySnapshot` com `code`, `value`
+   (NRT-102 rent @ 4200), `city`, `estateName` (ACME Imóveis) e `broker` (acme
+   Owner), além de `capturedAt`, `utm` (`campaign: winter`) e `interestType`.
+3. **Visita**: lead com `schedule {date, time}` → `payload.schedule` presente
+   (+ e-mail `visit_request` enfileirado).
+4. **WhatsApp**: clique → lead anônimo `channel: whatsapp`,
+   `interestType: falar_anunciante`, `origin: SITE_FORM`.
+5. **Financeiro leve**: captura sem perfil (`simulacao`) → **201**; perfil
+   derivado do anúncio (`propertyValue` 750000 → 4200 no RENT, cidade/UF do
+   imóvel); roteado ao parceiro `CredFácil` via `seed-rule-fallback`.
+6. **Qualificação**: `PATCH /api/leads/[id]` `{status: QUALIFIED, note, assignedToId}`
+   → `status: QUALIFIED`, `qualifiedAt`, `lastNote`, `assignedTo` populados.
+7. **Detalhe**: `GET /api/leads/[id]` → snapshot, `consent` (textVersion, IP,
+   UA, `grantedAt`) e entregas (`endpoint.scope`) retornados.
+8. **Exclusão**: `DELETE /api/leads/[id]` → `{deleted: true}`; os leads de teste
+   criados no smoke foram removidos ao final.
+
+---
+
+## Correções aplicadas após a auditoria (Item 7)
+
+1. **Campos derivados do anúncio não eram capturados** — valor, cidade,
+   imobiliária e corretor só existiam vivos no imóvel. Criado
+   `payload.propertySnapshot` (código, `value` por target SALE/RENT, cidade,
+   `estateName`, `broker` {id, name, email, phone}) capturado na submissão,
+   além de `capturedAt`.
+2. **UTM não fluía do portal** — o `ContactModal` nunca lia a URL; agora lê
+   `utm_*` e anexa nos formulários e no clique do WhatsApp (via API).
+3. **Apenas 2 CTAs no PDP** — faltavam "tenho interesse", "saber mais",
+   "financiamento", "alternativas para aquisição" e "simulação". O modal agora
+   expõe os 7 CTAs; a intenção é gravada como `interestType`.
+4. **Captura financeira exigia perfil completo** — schema relaxado (valor,
+   renda, entrada, prazo, cidade/UF opcionais); valor/cidade são derivados do
+   anúncio e faltas não bloqueiam o roteamento (regras avaliam o que existe).
+5. **Sem qualificação de leads** — não havia como abrir/promover/excluir um
+   lead. Criado `GET/PATCH/DELETE /api/leads/{id}` (status de funil, `note`,
+   `assignedToId` com validade de usuário + gate `leads:assign`,
+   `qualifiedAt`/`statusUpdatedAt`, auditoria `LEAD_UPDATED`/`LEAD_DELETED`).
+6. **§3.1 da API doc divergia** — `scope REAL_ESTATE|PLATFORM` e
+   `strategy PUSH|PULL|MANUAL` corrigidos para `REAL_ESTATE|FINANCIAL` e
+   `CUSTOM_JSON|FINANCE_DEFAULT|CRM_DEFAULT`.
+7. **WhatsApp sem intenção** — clique registrava lead anônimo sem CTA; agora
+   grava `interestType: falar_anunciante`.
+
+---
+
 ## Correções aplicadas após a auditoria (Item 5)
 
 1. **Duplicar conflitava no `externalCode`** — `duplicateProperty` copiava o
@@ -313,7 +387,7 @@ corrigidas (detalhes na seção "Correções" ao final).
 
 - `npx tsc --noEmit` — sem erros
 - `next lint` — sem warnings ou erros
-- `vitest run` — 208/208 testes passando
+- `vitest run` — 209/209 testes passando
 - Testes de segregação de dados (tenant A nunca lê dados de B) — verdes,
   incluindo as rotas públicas de itens 3 e 4
 - Seed demo: KPIs do painel populados (views, visitas, WhatsApp) de forma idempotente
@@ -321,3 +395,6 @@ corrigidas (detalhes na seção "Correções" ao final).
   destaque e galeria de mídia (com fallback local) validados via HTTP
 - Item 6 (importação/sincronização): CSV/XML/JSON e `/api/properties/sync` com
   dedupe, atualização idempotente e sync de status validados via HTTP
+- Item 7 (leads): 7 CTAs, snapshot de imóvel/imobiliária/corretor, UTM,
+  consentimento LGPD, captura financeira leve e qualificação de funil
+  (status/atribuição) validados via HTTP

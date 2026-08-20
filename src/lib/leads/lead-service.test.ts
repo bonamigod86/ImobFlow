@@ -11,6 +11,7 @@ type PrismaFn = ReturnType<typeof vi.fn>;
 interface PrismaMockModels {
   property: { findFirst: PrismaFn };
   tenant: { findFirst: PrismaFn; findUnique: PrismaFn };
+  user: { findFirst: PrismaFn };
   lead: { create: PrismaFn };
   leadConsent: { create: PrismaFn };
   webhookEndpoint: { findMany: PrismaFn; findUnique: PrismaFn };
@@ -23,6 +24,7 @@ const mocks = vi.hoisted(() => {
   const prismaUnscoped = {
     property: { findFirst: vi.fn() },
     tenant: { findFirst: vi.fn(), findUnique: vi.fn() },
+    user: { findFirst: vi.fn() },
     lead: { create: vi.fn() },
     leadConsent: { create: vi.fn() },
     webhookEndpoint: { findMany: vi.fn(), findUnique: vi.fn() },
@@ -52,9 +54,18 @@ const VISIBLE_PROPERTY = {
   title: "Apartamento Copacabana",
   city: "Rio de Janeiro",
   state: "RJ",
+  neighborhood: "Copacabana",
   target: "SALE",
   salePrice: { toString: () => "750000.00" },
   rentPrice: null,
+  tenant: { name: "Acme Corp" },
+};
+
+const BROKER = {
+  id: "u-broker",
+  name: "Ana Corretora",
+  email: "ana@acme.com",
+  phone: "+5511999998888",
 };
 
 const PTY = mocks.prismaUnscoped;
@@ -66,6 +77,7 @@ beforeEach(() => {
   PTY.auditLog.create.mockResolvedValue({ id: "audit" });
   PTY.leadConsent.create.mockResolvedValue({ id: "consent" });
   PTY.tenant.findUnique.mockResolvedValue({ id: "t-acme", name: "Acme Corp" });
+  PTY.user.findFirst.mockResolvedValue(BROKER);
 });
 
 const client = { ipAddress: "200.1.2.3", userAgent: "portal-bot", originUrl: "https://portal/imoveis/p1" };
@@ -77,6 +89,7 @@ const RE_INPUT = {
   phone: "+5511999990000",
   message: "Tenho interesse",
   schedule: null,
+  interestType: "tenho_interesse",
   utm: { source: "google", campaign: "launch" },
   consentTextVersion: "2026-08-19.v1",
   client,
@@ -105,6 +118,27 @@ describe("captureRealEstateLead", () => {
     expect(leadData.tenantId).toBe("t-acme");
     expect(leadData.propertyId).toBe("p1");
     expect(leadData.consent).toBeUndefined(); // consent is persisted separately
+
+    // Field contract: imóvel, código, valor, cidade, imobiliária, corretor,
+    // UTM/campanha, tipo de interesse, data/hora capturados no payload.
+    const payload = leadData.payload as Record<string, unknown>;
+    expect(payload.property).toEqual({
+      id: "p1",
+      code: "ACA-001",
+      title: "Apartamento Copacabana",
+    });
+    expect(payload.propertySnapshot).toMatchObject({
+      code: "ACA-001",
+      value: 750000,
+      city: "Rio de Janeiro",
+      state: "RJ",
+      neighborhood: "Copacabana",
+      estateName: "Acme Corp",
+      broker: { id: "u-broker", name: "Ana Corretora", email: "ana@acme.com", phone: "+5511999998888" },
+    });
+    expect(payload.interestType).toBe("tenho_interesse");
+    expect(payload.utm).toEqual({ source: "google", campaign: "launch" });
+    expect(payload.capturedAt).toEqual(expect.any(String));
 
     const consentData = PTY.leadConsent.create.mock.calls[0]![0]!.data;
     expect(consentData.leadId).toBe("lead-1");
@@ -218,6 +252,42 @@ describe("captureFinancialLead", () => {
     expect(out.tenantId).toBe("t-norton");
     expect(out.routing).toBe("internal");
     expect(QM.addWebhookTransmission).not.toHaveBeenCalled();
+  });
+
+  it("captures a light finance lead (profile derived from the listing when available)", async () => {
+    PTY.property.findFirst.mockResolvedValue(VISIBLE_PROPERTY);
+    PTY.lead.create.mockResolvedValue({ id: "fin-light", tenantId: "t-acme", type: "FINANCIAL" });
+    PTY.routingRule.findMany.mockResolvedValue([]);
+
+    const out = await captureFinancialLead({
+      name: "Paulo Salles",
+      email: "paulo@example.com",
+      phone: "+5511977776666",
+      interestType: "simulacao",
+      message: "Quero receber uma simulação.",
+      utm: { campaign: "verao" },
+      consentTextVersion: "2026-08-19.v1",
+      client,
+      propertyId: "p1",
+      tenantSlug: null,
+    });
+
+    expect(out.leadId).toBe("fin-light");
+    const leadData = PTY.lead.create.mock.calls[0]![0]!.data;
+    expect(leadData.type).toBe("FINANCIAL");
+    expect(leadData.financeProfile.create).toMatchObject({
+      tenantId: "t-acme",
+      propertyValue: 750000, // derived from the SALE listing
+      downPayment: null,
+      monthlyIncome: null,
+      city: "Rio de Janeiro",
+      state: "RJ",
+    });
+    const payload = leadData.payload as Record<string, unknown>;
+    expect(payload.interestType).toBe("simulacao");
+    expect(payload.message).toBe("Quero receber uma simulação.");
+    expect(payload.propertySnapshot).toMatchObject({ code: "ACA-001", estateName: "Acme Corp" });
+    expect(payload.utm).toEqual({ campaign: "verao" });
   });
 
   it("routes to the matched partner endpoint with finance profile details", async () => {

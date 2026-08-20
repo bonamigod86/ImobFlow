@@ -116,6 +116,24 @@ export const utmSchema = z
 export type UtmInput = z.infer<typeof utmSchema>;
 
 /**
+ * Type of interest captured at the CTA (portal). One entry per CTA label so the
+ * funnel keeps the exact intent even when the lead type stays generic.
+ */
+export const interestTypes = [
+  "tenho_interesse",
+  "agendar_visita",
+  "falar_anunciante",
+  "saber_mais",
+  "financiamento",
+  "alternativas_aquisicao",
+  "simulacao",
+] as const;
+
+export type InterestType = (typeof interestTypes)[number];
+
+export const interestTypeSchema = z.enum(interestTypes);
+
+/**
  * LGPD consent gate. The client asserts a grant; the server resolves the exact
  * statement text by version (server-owned, see src/lib/leads/consent.ts) and
  * rejects unknown/legacy versions. The IP + origin URL are stamped server-side.
@@ -137,6 +155,8 @@ export const publicRealEstateLeadSchema = z
     message: z.string().trim().max(2000).optional(),
     /** "form" — filled intake; "whatsapp" — visitor clicked the WhatsApp CTA. */
     channel: z.enum(["form", "whatsapp"]).optional().default("form"),
+    /** CTA intent captured on the portal (one of the 7 CTA labels). */
+    interestType: interestTypeSchema.optional(),
     schedule: z
       .object({
         date: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.").optional(),
@@ -159,20 +179,26 @@ export type PublicRealEstateLeadInput = z.infer<typeof publicRealEstateLeadSchem
 export const publicFinancialLeadSchema = z
   .object({
     name: z.string().trim().min(1, "Informe seu nome.").max(255),
-    email: z.string().trim().email("E-mail inválido.").max(255),
+    email: z.string().trim().email("E-mail inválido.").max(255).optional().or(z.literal("")),
     phone: z.string().trim().min(8, "Informe um telefone com DDD.").max(30),
-    propertyValue: z.coerce.number().positive("Informe o valor do imóvel.").max(1e12),
-    downPayment: z.coerce.number().nonnegative().max(1e12),
+    message: z.string().trim().max(2000).optional(),
+    /** CTA intent (financing / alternatives / simulation — kept in payload). */
+    interestType: interestTypeSchema.optional(),
+    /// Finance profile is filled "when available" (light capture allowed): the
+    /// broker may pre-fill from the listing and the buyer may complete later.
+    propertyValue: z.coerce.number().positive().max(1e12).optional(),
+    downPayment: z.coerce.number().nonnegative().max(1e12).optional(),
     financingAmount: z.coerce.number().nonnegative().max(1e12).optional(),
-    monthlyIncome: z.coerce.number().nonnegative("Informe sua renda aproximada.").max(1e12),
-    monthlyInstallmentLimit: z.coerce.number().nonnegative().max(1e12),
-    termMonths: z.coerce.number().int().min(1, "Informe o prazo em meses.").max(480),
-    city: z.string().trim().min(1, "Informe a cidade.").max(120),
+    monthlyIncome: z.coerce.number().nonnegative().max(1e12).optional(),
+    monthlyInstallmentLimit: z.coerce.number().nonnegative().max(1e12).optional(),
+    termMonths: z.coerce.number().int().min(1).max(480).optional(),
+    city: z.string().trim().min(1).max(120).optional(),
     state: z
       .string()
       .trim()
       .regex(/^[A-Za-z]{2}$/, "UF inválida.")
-      .transform((v) => v.toUpperCase()),
+      .transform((v) => v.toUpperCase())
+      .optional(),
     /// Tenant scoping for unattributed funnels: either a listing (derives the
     /// tenant from the property) or an explicit tenant slug. At least one is
     /// required so a public financial lead is never tenant-less.
