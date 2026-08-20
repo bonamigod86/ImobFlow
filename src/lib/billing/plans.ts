@@ -1,4 +1,4 @@
-import type { BillingCycle, Plan } from "@prisma/client";
+import type { BillingCycle, Plan, Prisma } from "@prisma/client";
 import { prismaUnscoped } from "@/lib/prisma/client";
 import { AppError } from "@/lib/http/errors";
 import type { PlanDefinition } from "@/lib/billing/types";
@@ -40,12 +40,75 @@ function toDefinition(plan: Plan): PlanDefinition {
   };
 }
 
+/** Shared scalar guards so every plan write enforces the same invariants. */
+function assertPlanScalars(input: {
+  priceCents?: number;
+  highlightCredits?: number;
+  gracePeriodDays?: number;
+  trialDays?: number;
+}): void {
+  if (input.priceCents !== undefined && (!Number.isInteger(input.priceCents) || input.priceCents < 0)) {
+    throw new AppError(400, "INVALID_PRICE", "O preço deve ser um valor inteiro em centavos.");
+  }
+  if (
+    input.highlightCredits !== undefined &&
+    (!Number.isInteger(input.highlightCredits) || input.highlightCredits < 0)
+  ) {
+    throw new AppError(400, "INVALID_CREDITS", "highlightCredits deve ser um inteiro >= 0.");
+  }
+  if (
+    input.gracePeriodDays !== undefined &&
+    (!Number.isInteger(input.gracePeriodDays) || input.gracePeriodDays < 0 || input.gracePeriodDays > 365)
+  ) {
+    throw new AppError(400, "INVALID_GRACE", "gracePeriodDays deve ser um inteiro entre 0 e 365.");
+  }
+  if (
+    input.trialDays !== undefined &&
+    (!Number.isInteger(input.trialDays) || input.trialDays < 0 || input.trialDays > 365)
+  ) {
+    throw new AppError(400, "INVALID_TRIAL", "trialDays deve ser um inteiro entre 0 e 365.");
+  }
+}
+
 export async function listPlans(input: { includeInactive?: boolean } = {}): Promise<PlanDefinition[]> {
   const plans = await prismaUnscoped.plan.findMany({
     where: input.includeInactive ? undefined : { isActive: true },
     orderBy: [{ priceCents: "asc" }, { code: "asc" }],
   });
   return plans.map(toDefinition);
+}
+
+/**
+ * Create a brand-new plan (configurable catalogue — no code changes needed).
+ * `code` is the immutable identifier used by rules/provisioning/tests.
+ */
+export async function createPlan(input: PlanCreateInput): Promise<PlanDefinition> {
+  assertPlanScalars(input);
+
+  const features: Record<string, unknown> = {};
+  if (input.maxProperties !== undefined) features.maxProperties = input.maxProperties;
+  if (input.maxUsers !== undefined) features.maxUsers = input.maxUsers;
+  if (input.maxLeads !== undefined) features.maxLeads = input.maxLeads;
+
+  const plan = await prismaUnscoped.plan.create({
+    data: {
+      code: input.code,
+      name: input.name,
+      description: input.description ?? null,
+      priceCents: input.priceCents ?? 0,
+      billingCycle: input.billingCycle ?? "MONTHLY",
+      maxProperties: input.maxProperties ?? null,
+      maxUsers: input.maxUsers ?? null,
+      maxLeads: input.maxLeads ?? null,
+      highlightCredits: input.highlightCredits ?? 0,
+      gracePeriodDays: input.gracePeriodDays ?? 5,
+      trialDays: input.trialDays ?? 14,
+      isActive: input.isActive ?? true,
+      features: features as Prisma.InputJsonValue,
+    },
+  });
+
+  return toDefinition(plan);
 }
 
 export async function updatePlanFromDefinition(
@@ -57,12 +120,7 @@ export async function updatePlanFromDefinition(
     throw new AppError(404, "PLAN_NOT_FOUND", `Plano "${code}" não encontrado.`);
   }
 
-  if (input.highlightCredits !== undefined && (!Number.isInteger(input.highlightCredits) || input.highlightCredits < 0)) {
-    throw new AppError(400, "INVALID_CREDITS", "highlightCredits deve ser um inteiro >= 0.");
-  }
-  if (input.priceCents !== undefined && (!Number.isInteger(input.priceCents) || input.priceCents < 0)) {
-    throw new AppError(400, "INVALID_PRICE", "O preço deve ser um valor inteiro em centavos.");
-  }
+  assertPlanScalars(input);
 
   const features: Record<string, unknown> = (plan.features as Record<string, unknown>) ?? {};
   const updated = await prismaUnscoped.plan.update({

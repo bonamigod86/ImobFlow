@@ -8,6 +8,7 @@ import { ok } from "@/lib/http/errors";
 import { AuditService } from "@/lib/audit/audit-service";
 import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 import { withPublicIdentity } from "@/lib/properties/property-service";
+import { assertPropertyCreationAllowed } from "@/lib/billing/limits";
 
 /**
  * GET/POST /api/properties
@@ -81,6 +82,9 @@ export const GET = withApiRoute(ACTIONS.PROPERTIES_READ, async (_ctx, req) => {
 
 export const POST = withApiRoute(ACTIONS.PROPERTIES_CREATE, async (ctx, req) => {
   const body = propertySchema.parse(await req.json());
+  if (ctx.tenantId) {
+    await assertPropertyCreationAllowed(ctx.tenantId);
+  }
   const publicIdentity = await withPublicIdentity(body, undefined);
   const property = await prisma.property.create({
     data: {

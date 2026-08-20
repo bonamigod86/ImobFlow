@@ -370,3 +370,38 @@ export const tenantProfilePatchSchema = z.object({
   broker: brokerProfileSchema.partial().optional(),
 });
 export type TenantProfilePatchInput = z.infer<typeof tenantProfilePatchSchema>;
+
+/**
+ * Plan catalogue contract (checklist item 12) — shared by the MASTER admin
+ * create/edit endpoints so a new plan is pure configuration.
+ */
+export const planFieldsSchema = z.object({
+  name: z.string().trim().min(1, "name é obrigatório.").max(120),
+  description: z.string().trim().max(400).nullable().optional(),
+  priceCents: z.number().int().min(0, "O preço deve ser um inteiro >= 0.").default(0),
+  billingCycle: z.enum(["MONTHLY", "YEARLY"]).default("MONTHLY"),
+  maxProperties: z.number().int().min(0).nullable().optional(),
+  maxUsers: z.number().int().min(0).nullable().optional(),
+  maxLeads: z.number().int().min(0).nullable().optional(),
+  highlightCredits: z.number().int().min(0).default(0),
+  gracePeriodDays: z.number().int().min(0).max(365).default(5),
+  trialDays: z.number().int().min(0).max(365).default(14),
+  isActive: z.boolean().default(true),
+});
+export type PlanFieldsInput = z.infer<typeof planFieldsSchema>;
+
+export const planCreateSchema = z
+  .object({
+    code: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(/^[a-z0-9][a-z0-9-]{1,39}$/, "Código: minúsculas, números e hífens (2–40).")
+      .describe("Identificador imutável do plano (usado por regras/provisionamento)."),
+    ...planFieldsSchema.shape,
+  })
+  .strict();
+export type PlanCreateInput = z.infer<typeof planCreateSchema>;
+
+export const planPatchSchema = planFieldsSchema.partial().strict();
+export type PlanPatchInput = z.infer<typeof planPatchSchema>;

@@ -1,6 +1,7 @@
 import { Prisma, type PropertyStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { buildSearchText, ensureUniqueSlug, slugBaseFrom } from "@/lib/properties/seo";
+import { assertPropertyCreationAllowed } from "@/lib/billing/limits";
 
 /**
  * PropertyManagementService — Phase 2 engine operations.
@@ -67,6 +68,7 @@ export async function duplicateProperty(id: string, overrides: { title?: string 
   } = source;
   const newCode = await nextAvailableCode(source.tenantId, source.code);
   const title = overrides.title ?? `${source.title} (cópia)`;
+  await assertPropertyCreationAllowed(source.tenantId);
   const publicIdentity = await withPublicIdentity({ ...source, title, code: newCode });
 
   const property = await prisma.property.create({

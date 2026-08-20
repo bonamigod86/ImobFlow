@@ -14,6 +14,10 @@ const mocks = vi.hoisted(() => ({
     findMany: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    count: vi.fn(),
+  },
+  tenant: {
+    findUnique: vi.fn(),
   },
 }));
 
@@ -25,6 +29,10 @@ vi.mock("@/lib/prisma/client", () => ({
   prismaUnscoped: {
     property: {
       findUnique: mocks.property.findUnique,
+      count: mocks.property.count,
+    },
+    tenant: {
+      findUnique: mocks.tenant.findUnique,
     },
   },
 }));
@@ -72,6 +80,8 @@ const baseProperty = {
 describe("PropertyManagementService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.tenant.findUnique.mockResolvedValue({ plan: { maxProperties: null } });
+    mocks.property.count.mockResolvedValue(0);
   });
 
   it("duplicates a property with a fresh code and reset flags", async () => {

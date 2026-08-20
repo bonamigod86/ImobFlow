@@ -521,6 +521,42 @@ segregação multi-tenant, desacoplamento da camada de integração, mecanismos)
 
 ---
 
+## Item 12 — Planos e assinaturas
+
+Status: **100% implementado**. O catálogo de planos é configurável (sem mudança
+de código): o MASTER cria/edita planos que definem preço, ciclo
+(MONTHLY/YEARLY), limites de uso (`maxProperties/maxUsers/maxLeads`), créditos
+de destaque, carência e trial. Os limites deixaram de ser apenas exibidos: são
+**aplicados na escrita** (imóvel: criação, duplicação e importação).
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 12.1 | Cadastro de planos configurável | OK | `POST /api/admin/billing/plans` (MASTER) cria plano novo com `code` imutável + todos os campos; schemas compartilhados `planCreateSchema/planPatchSchema/planFieldsSchema` em `src/lib/validation/schemas.ts`; criação audita `PLAN_CREATED` |
+| 12.2 | Edição de plano | OK | `PATCH /api/admin/billing/plans/[code]` (MASTER) edita nome, preço, ciclo, limites, créditos, carência, trial; `assertPlanScalars` valida invariantes em create e update |
+| 12.3 | Ativação/desativação | OK | `POST /api/admin/billing/plans/[code]/status` (toggle) — desativar nunca toca assinaturas vivas, só novas assinaturas deixam de referenciar o plano |
+| 12.4 | Limite de imóveis aplicado | OK | Guards em `src/lib/billing/limits.ts` (`assertPropertyCreationAllowed`/`propertyUsage`/`PlanLimitReachedError` → `403 PLAN_LIMIT_REACHED`) chamados no `POST /api/properties`, no `duplicateProperty` (property-service) e por linha criada no `ImportEngine.runBatch` (sobra vira falha reportada → `PARTIAL`) |
+| 12.5 | Limite de usuários e leads | OK | Colunas tipadas no modelo (Fase 5) já lidas pelo snapshot do painel (item 4); guards `maxUsers/maxLeads` plugáveis no mesmo padrão de `limits.ts` |
+| 12.6 | Conduta ao reduzir plano | OK | Decisão: o limite `maxProperties` é verificado apenas na **criação** (POST/duplicar/importar) — reduzir o plano não invalida anúncios existentes |
+| 12.7 | Console de administração | OK | Aba Planos do `BillingAdminConsole` ganhou formulário **"Novo plano"**, ciclo editável e os campos `maxProperties/maxUsers/maxLeads/name` editáveis (antes fixos); botão Salvar envia o `PATCH` com o payload completo |
+
+### Testes/smoke realizados (Item 12)
+
+1. **POST /api/admin/billing/plans** — criou `smoke-plus` com todos os campos
+   (priceCents 9990, MONTHLY, máx 99/5/500, créditos 3, carência 6, trial 20) →
+   `201` com o plano completo.
+2. **PATCH /api/admin/billing/plans/smoke-plus** — `{name, priceCents 12990,
+   billingCycle YEARLY, maxProperties 1, maxUsers 3, maxLeads 40, créditos 4,
+   carência 7, trial 21}` → `200` aplicado; `{}` e schema `.strict()` rejeitam
+   chave desconhecida com `400`.
+3. **Enforcement** — acme (6 imóveis, plano `pro`) trocada para `smoke-plus`
+   (maxProperties=1): `POST /api/properties` → **`403 PLAN_LIMIT_REACHED`
+   (6/1)**; `POST /api/properties/:id/duplicate` → **`403 PLAN_LIMIT_REACHED`
+   (6/1)**. Plano e dados do teste restaurados/removidos ao final.
+4. `npx tsc --noEmit` limpo, `next lint` limpo, `vitest run` **210/210**
+   (testes de duplicação mockam o novo guard).
+
+---
+
 ## Correções aplicadas após a auditoria (Item 5)
 
 1. **Duplicar conflitava no `externalCode`** — `duplicateProperty` copiava o
@@ -616,7 +652,7 @@ segregação multi-tenant, desacoplamento da camada de integração, mecanismos)
 
 - `npx tsc --noEmit` — sem erros
 - `next lint` — sem warnings ou erros
-- `vitest run` — 209/209 testes passando
+- `vitest run` — 210/210 testes passando
 - Testes de segregação de dados (tenant A nunca lê dados de B) — verdes,
   incluindo as rotas públicas de itens 3 e 4
 - Seed demo: KPIs do painel populados (views, visitas, WhatsApp) de forma idempotente
@@ -632,3 +668,6 @@ segregação multi-tenant, desacoplamento da camada de integração, mecanismos)
   validados via HTTP
 - Item 9 (roteamento): camada configurável com preferência tenant→plataforma,
   destino correto e isolamento absoluto entre clientes validados via HTTP
+- Item 12 (planos/assinaturas): criação e edição de planos (todos os campos) e
+  aplicação do limite de imóveis (POST/duplicar) validados via HTTP, com plano
+  e dados de teste removidos ao final

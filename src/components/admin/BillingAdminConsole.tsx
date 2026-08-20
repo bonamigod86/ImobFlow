@@ -118,6 +118,17 @@ function brl(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+/** Render a nullable numeric plan field in an <input>. */
+function limitValue(v: number | null): string {
+  return v === null ? "" : String(v);
+}
+
+/** Parse an empty string back to null (unlimited). */
+function parseLimit(v: string): number | null {
+  const n = Number(v);
+  return v.trim() === "" || Number.isNaN(n) ? null : Math.max(0, Math.trunc(n));
+}
+
 function date(s: string | null): string {
   if (!s) return "—";
   return new Date(s).toLocaleDateString("pt-BR");
@@ -137,6 +148,17 @@ export default function BillingAdminConsole({ user }: { user: { name: string; em
 
   const [provisionPlanCode, setProvisionPlanCode] = useState("");
   const [scanResult, setScanResult] = useState<{ scan?: { preDueNotified: number; trialExpired: number; suspended: number; skippedSuspended: number }; highlightsExpired?: number } | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newPlan, setNewPlan] = useState({
+    code: "",
+    name: "",
+    priceCents: "0",
+    billingCycle: "MONTHLY" as "MONTHLY" | "YEARLY",
+    maxProperties: "",
+    maxUsers: "",
+    maxLeads: "",
+    highlightCredits: "0",
+  });
 
   async function fetchJson<T>(path: string): Promise<T> {
     const res = await fetch(path);
@@ -246,6 +268,30 @@ export default function BillingAdminConsole({ user }: { user: { name: string; em
       await loadAll();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao alternar plano.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createNewPlan() {
+    setBusy(true);
+    setError(null);
+    try {
+      await postJson("/api/admin/billing/plans", {
+        code: newPlan.code.trim().toLowerCase(),
+        name: newPlan.name.trim(),
+        priceCents: Number(newPlan.priceCents) || 0,
+        billingCycle: newPlan.billingCycle,
+        maxProperties: parseLimit(newPlan.maxProperties),
+        maxUsers: parseLimit(newPlan.maxUsers),
+        maxLeads: parseLimit(newPlan.maxLeads),
+        highlightCredits: Number(newPlan.highlightCredits) || 0,
+      });
+      setShowCreate(false);
+      setNewPlan({ code: "", name: "", priceCents: "0", billingCycle: "MONTHLY", maxProperties: "", maxUsers: "", maxLeads: "", highlightCredits: "0" });
+      await loadAll();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao criar plano.");
     } finally {
       setBusy(false);
     }
@@ -404,13 +450,68 @@ export default function BillingAdminConsole({ user }: { user: { name: string; em
 
       {tab === "plans" && (
         <div className="card">
-          <h2>Planos</h2>
+          <div className="row" style={{ justifyContent: "space-between", marginBottom: "0.75rem" }}>
+            <h2>Planos</h2>
+            <button onClick={() => setShowCreate((v) => !v)} disabled={busy}>
+              {showCreate ? "Cancelar" : "Novo plano"}
+            </button>
+          </div>
+
+          {showCreate && (
+            <div className="card" style={{ marginBottom: "1rem" }}>
+              <h3>Novo plano</h3>
+              <div className="grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(13rem, 1fr))", gap: "0.5rem" }}>
+                <label>
+                  Código (imutável)
+                  <input value={newPlan.code} onChange={(e) => setNewPlan((d) => ({ ...d, code: e.target.value }))} placeholder="ex: plus" />
+                </label>
+                <label>
+                  Nome
+                  <input value={newPlan.name} onChange={(e) => setNewPlan((d) => ({ ...d, name: e.target.value }))} placeholder="ex: Plus" />
+                </label>
+                <label>
+                  Preço (centavos)
+                  <input type="number" min={0} value={newPlan.priceCents} onChange={(e) => setNewPlan((d) => ({ ...d, priceCents: e.target.value }))} />
+                </label>
+                <label>
+                  Ciclo
+                  <select value={newPlan.billingCycle} onChange={(e) => setNewPlan((d) => ({ ...d, billingCycle: e.target.value as "MONTHLY" | "YEARLY" }))}>
+                    <option value="MONTHLY">Mensal</option>
+                    <option value="YEARLY">Anual</option>
+                  </select>
+                </label>
+                <label>
+                  Máx. imóveis (vazio = ilimitado)
+                  <input type="number" min={0} value={newPlan.maxProperties} onChange={(e) => setNewPlan((d) => ({ ...d, maxProperties: e.target.value }))} />
+                </label>
+                <label>
+                  Máx. usuários (vazio = ilimitado)
+                  <input type="number" min={0} value={newPlan.maxUsers} onChange={(e) => setNewPlan((d) => ({ ...d, maxUsers: e.target.value }))} />
+                </label>
+                <label>
+                  Máx. leads (vazio = ilimitado)
+                  <input type="number" min={0} value={newPlan.maxLeads} onChange={(e) => setNewPlan((d) => ({ ...d, maxLeads: e.target.value }))} />
+                </label>
+                <label>
+                  Créditos de destaque
+                  <input type="number" min={0} value={newPlan.highlightCredits} onChange={(e) => setNewPlan((d) => ({ ...d, highlightCredits: e.target.value }))} />
+                </label>
+              </div>
+              <div className="row" style={{ marginTop: "0.75rem" }}>
+                <button onClick={() => void createNewPlan()} disabled={busy || !newPlan.code.trim() || !newPlan.name.trim()}>
+                  Criar plano
+                </button>
+              </div>
+            </div>
+          )}
+
           <table>
             <thead>
               <tr>
                 <th>Plano</th>
                 <th>Preço (centavos)</th>
                 <th>Ciclo</th>
+                <th>Limites</th>
                 <th>Créditos destaque</th>
                 <th>Carência (dias)</th>
                 <th>Trial (dias)</th>
@@ -650,15 +751,25 @@ function PlanEditor({
   const [draft, setDraft] = useState<PlanRow>(plan);
   useEffect(() => setDraft(plan), [plan]);
 
-  const set = (key: keyof PlanRow, value: unknown) => setDraft((d) => ({ ...d, [key]: value }));
-  const dirty = ["priceCents", "highlightCredits", "gracePeriodDays", "trialDays", "isActive"].some(
-    (k) => (draft as unknown as Record<string, unknown>)[k] !== (plan as unknown as Record<string, unknown>)[k],
-  );
+  const set = <K extends keyof PlanRow>(key: K, value: PlanRow[K]) => setDraft((d) => ({ ...d, [key]: value }));
+  const tracked: Array<keyof PlanRow> = [
+    "name",
+    "priceCents",
+    "billingCycle",
+    "maxProperties",
+    "maxUsers",
+    "maxLeads",
+    "highlightCredits",
+    "gracePeriodDays",
+    "trialDays",
+  ];
+  const dirty = tracked.some((k) => draft[k] !== plan[k]);
 
   return (
     <tr>
       <td>
-        {plan.name} <span className="muted">({plan.code})</span>
+        <input value={draft.name} onChange={(e) => set("name", e.target.value)} style={{ width: "9rem" }} />
+        <span className="muted">({plan.code})</span>
       </td>
       <td>
         <input
@@ -668,13 +779,31 @@ function PlanEditor({
           style={{ width: "7rem" }}
         />
       </td>
-      <td>{plan.billingCycle}</td>
+      <td>
+        <select value={draft.billingCycle} onChange={(e) => set("billingCycle", e.target.value as "MONTHLY" | "YEARLY")}>
+          <option value="MONTHLY">Mensal</option>
+          <option value="YEARLY">Anual</option>
+        </select>
+      </td>
+      <td>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+          <label title="Máx. imóveis">Imóv.
+            <input type="number" value={limitValue(draft.maxProperties)} onChange={(e) => set("maxProperties", parseLimit(e.target.value))} style={{ width: "4.5rem" }} />
+          </label>
+          <label title="Máx. usuários">Usu.
+            <input type="number" value={limitValue(draft.maxUsers)} onChange={(e) => set("maxUsers", parseLimit(e.target.value))} style={{ width: "4.5rem" }} />
+          </label>
+          <label title="Máx. leads">Leads
+            <input type="number" value={limitValue(draft.maxLeads)} onChange={(e) => set("maxLeads", parseLimit(e.target.value))} style={{ width: "4.5rem" }} />
+          </label>
+        </div>
+      </td>
       <td>
         <input
           type="number"
           value={draft.highlightCredits}
           onChange={(e) => set("highlightCredits", Number(e.target.value))}
-          style={{ width: "7rem" }}
+          style={{ width: "6rem" }}
         />
       </td>
       <td>
@@ -682,7 +811,7 @@ function PlanEditor({
           type="number"
           value={draft.gracePeriodDays}
           onChange={(e) => set("gracePeriodDays", Number(e.target.value))}
-          style={{ width: "7rem" }}
+          style={{ width: "5rem" }}
         />
       </td>
       <td>
@@ -690,7 +819,7 @@ function PlanEditor({
           type="number"
           value={draft.trialDays}
           onChange={(e) => set("trialDays", Number(e.target.value))}
-          style={{ width: "7rem" }}
+          style={{ width: "5rem" }}
         />
       </td>
       <td>
@@ -699,7 +828,12 @@ function PlanEditor({
       <td>
         <div className="row">
           <button className="secondary" onClick={() => void onSave(plan, {
+            name: draft.name,
             priceCents: draft.priceCents,
+            billingCycle: draft.billingCycle,
+            maxProperties: draft.maxProperties,
+            maxUsers: draft.maxUsers,
+            maxLeads: draft.maxLeads,
             highlightCredits: draft.highlightCredits,
             gracePeriodDays: draft.gracePeriodDays,
             trialDays: draft.trialDays,

@@ -7,6 +7,7 @@ import type { NormalizedPropertyRow } from "@/lib/imports/parsers";
 import { withTenantContext } from "@/lib/tenant/context";
 import { buildSearchText, ensureUniqueSlug, slugBaseFrom } from "@/lib/properties/seo";
 import { NonRetryableError } from "@/workers/helpers";
+import { propertyUsage, PlanLimitReachedError } from "@/lib/billing/limits";
 
 /**
  * ImportEngine — processes one ImportBatch.
@@ -38,7 +39,11 @@ export class ImportEngine {
    * Skipped covers explicit status INACTIVE on import (kept silent by design)
    * as well as dedupe collisions that don't change anything.
    */
-  static async upsertRow(tenantId: string, row: NormalizedPropertyRow): Promise<"created" | "updated" | "skipped"> {
+  static async upsertRow(
+    tenantId: string,
+    row: NormalizedPropertyRow,
+    createAllowance?: { remaining: number | null; cap: number },
+  ): Promise<"created" | "updated" | "skipped"> {
     const data: Prisma.PropertyUncheckedCreateInput = {
       tenantId,
       code: row.code ?? row.externalCode ?? `IMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -99,6 +104,14 @@ export class ImportEngine {
       return "updated";
     }
 
+    // Enforce the plan's property quota per CREATED row (updates/skips are free).
+    if (createAllowance) {
+      if (createAllowance.remaining !== null && createAllowance.remaining <= 0) {
+        throw new PlanLimitReachedError("imóveis", createAllowance.cap, createAllowance.cap);
+      }
+      if (createAllowance.remaining !== null) createAllowance.remaining -= 1;
+    }
+
     await prisma.property.create({ data });
     return "created";
   }
@@ -129,6 +142,16 @@ export class ImportEngine {
       const payload = batch.errors as unknown as { rows?: NormalizedPropertyRow[] } | null;
       const rows = payload?.rows ?? [];
 
+      // Plan quota: compute usage once and hand a per-row CREATE budget to
+      // each row (updates/skips consume nothing). Hitting the cap turns the
+      // remaining rows into reported failures (batch goes PARTIAL) instead of
+      // silently exceeding the plan.
+      const usage = await propertyUsage(tenantId);
+      const createAllowance = {
+        remaining: usage.cap === null ? null : Math.max(0, usage.cap - usage.current),
+        cap: usage.cap ?? 0,
+      };
+
       let imported = 0;
       let updated = 0;
       let skipped = 0;
@@ -136,7 +159,7 @@ export class ImportEngine {
 
       for (const row of rows) {
         try {
-          const action = await ImportEngine.upsertRow(tenantId, row);
+          const action = await ImportEngine.upsertRow(tenantId, row, createAllowance);
           if (action === "created") imported++;
           else if (action === "updated") updated++;
           else skipped++;
