@@ -35,10 +35,43 @@ export class TenantAdminService {
     }
     if (tenant.status === newStatus) return tenant; // no-op
 
+    // Manual (ops) lockout semantics: a BLOCKED transition stamps the lockout
+    // so a later webhook payment can never silently unblock it; an operator
+    // unblock is the ONLY thing that clears it (and the stored reason).
+    const blocking = newStatus === "BLOCKED";
+    const now = new Date();
     const updated = await prismaUnscoped.tenant.update({
       where: { id: tenantId },
-      data: { status: newStatus },
+      data: {
+        status: newStatus,
+        manualBlockedAt: blocking
+          ? now
+          : tenant.manualBlockedAt
+            ? null
+            : undefined,
+        blockReason: blocking
+          ? (reason ?? "Bloqueio manual pela operação")
+          : tenant.manualBlockedAt
+            ? null
+            : undefined,
+      },
     });
+
+    // Keep the derived subscription row in sync so the billing console reads
+    // one coherent lifecycle (data is never touched — status flip only).
+    const subscription = await prismaUnscoped.tenantSubscription.findUnique({
+      where: { tenantId },
+    });
+    if (subscription) {
+      await prismaUnscoped.tenantSubscription.update({
+        where: { id: subscription.id },
+        data: {
+          status: newStatus,
+          blockedAt: blocking ? now : undefined,
+          cancelledAt: newStatus === "CANCELLED" ? now : undefined,
+        },
+      });
+    }
 
     // Invalidate cached snapshots so gate logic picks the new status instantly.
     await TenantCache.invalidate(updated.id, updated.slug);
@@ -48,7 +81,9 @@ export class TenantAdminService {
       actorUserId,
       from: tenant.status,
       to: newStatus,
-      reason,
+      reason: blocking
+        ? `manual:${reason ?? "bloqueio manual"}`
+        : reason,
     });
 
     return updated;

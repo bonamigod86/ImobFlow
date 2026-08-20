@@ -76,6 +76,8 @@ const envSchema = z.object({
   BILLING_GRACE_DAYS: z.coerce.number().int().min(0).max(365).default(5),
   /** Days before the due date a PRE_DUE dunning notification is triggered. */
   BILLING_PRE_DUE_NOTIFY_DAYS: z.coerce.number().int().min(0).max(365).default(3),
+  /** Cadence (days) of LATE_REMINDER re-notifications once a bill is PAST_DUE. */
+  BILLING_DUNNING_LATE_EVERY_DAYS: z.coerce.number().int().min(1).max(90).default(3),
   /** Master switch for the automatic account suspension (grace expiry). */
   BILLING_AUTOSUSPEND_ENABLED: z
     .enum(["true", "false"])

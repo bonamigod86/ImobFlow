@@ -175,6 +175,7 @@ export async function getMasterControlData(): Promise<MasterControlData> {
           select: {
             createdAt: true,
             nextInvoiceDueAt: true,
+            graceEndsAt: true,
             plan: { select: { name: true } },
           },
         },
@@ -242,7 +243,8 @@ export async function getMasterControlData(): Promise<MasterControlData> {
       const earliest = earliestDueByTenant.get(t.id);
       const daysOverdue =
         earliest !== undefined ? Math.max(0, Math.floor((now - earliest) / DAY_MS)) : 0;
-      const graceEndsAtValue = earliest !== undefined ? earliest + 7 * DAY_MS : undefined;
+      const fallbackGrace =
+        earliest !== undefined ? earliest + 7 * DAY_MS : undefined;
       return {
         id: t.id,
         name: t.name,
@@ -251,7 +253,8 @@ export async function getMasterControlData(): Promise<MasterControlData> {
         daysOverdue,
         pendingCents: pendingByTenant.get(t.id) ?? 0,
         graceEndsAt:
-          graceEndsAtValue === undefined ? null : new Date(graceEndsAtValue).toISOString(),
+          t.subscription?.graceEndsAt?.toISOString() ??
+          (fallbackGrace === undefined ? null : new Date(fallbackGrace).toISOString()),
       };
     })
     .sort((a, b) => b.daysOverdue - a.daysOverdue);

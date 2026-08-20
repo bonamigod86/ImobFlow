@@ -20,6 +20,7 @@ export const PROVIDER_LABELS: Record<BillingProvider, string> = {
 export const STATUS_LABELS: Record<TenantStatus, string> = {
   TRIAL: "Trial",
   ACTIVE: "Ativo",
+  PENDING_DUE: "Pendente",
   PAST_DUE: "Em atraso",
   BLOCKED: "Bloqueado",
   CANCELLED: "Cancelado",

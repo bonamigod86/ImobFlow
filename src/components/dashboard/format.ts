@@ -15,6 +15,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 export const TENANT_STATUS_LABELS: Record<TenantStatus, string> = {
   ACTIVE: "Ativo",
   TRIAL: "Avaliação",
+  PENDING_DUE: "Pendente",
   PAST_DUE: "Inadimplente",
   BLOCKED: "Bloqueado",
   CANCELLED: "Cancelado",
@@ -26,6 +27,7 @@ export const TENANT_STATUS_VARIANTS: Record<
 > = {
   ACTIVE: "success",
   TRIAL: "info",
+  PENDING_DUE: "warning",
   PAST_DUE: "warning",
   BLOCKED: "danger",
   CANCELLED: "danger",

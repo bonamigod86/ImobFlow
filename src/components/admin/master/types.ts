@@ -86,6 +86,7 @@ export interface PlanOption {
 export const STATUS_LABELS: Record<TenantStatus, string> = {
   TRIAL: "Trial",
   ACTIVE: "Ativo",
+  PENDING_DUE: "Pendente",
   PAST_DUE: "Em atraso",
   BLOCKED: "Bloqueado",
   CANCELLED: "Cancelado",
@@ -94,6 +95,7 @@ export const STATUS_LABELS: Record<TenantStatus, string> = {
 export const STATUS_BADGE: Record<TenantStatus, "success" | "warning" | "danger" | "secondary" | "neutral"> = {
   TRIAL: "neutral",
   ACTIVE: "success",
+  PENDING_DUE: "warning",
   PAST_DUE: "warning",
   BLOCKED: "danger",
   CANCELLED: "secondary",

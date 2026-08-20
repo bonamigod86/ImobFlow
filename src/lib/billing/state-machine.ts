@@ -1,4 +1,5 @@
 import type {
+  BillingNotificationKind,
   BillingProvider,
   PaymentInvoiceStatus,
   Plan,
@@ -115,7 +116,7 @@ async function upsertInvoice(tx: Tx, input: {
   paidAt?: Date;
   attemptsDelta?: number;
   metadata?: unknown;
-}): Promise<{ id: string; providerInvoiceId: string | null; status: PaymentInvoiceStatus; paidAt: Date | null }> {
+}): Promise<{ id: string; providerInvoiceId: string | null; status: PaymentInvoiceStatus; paidAt: Date | null; dueDate: Date }> {
   const { providerInvoiceId, ...rest } = input;
   const row = await tx.paymentInvoice.findFirst({
     where: providerInvoiceId
@@ -153,7 +154,7 @@ async function upsertInvoice(tx: Tx, input: {
 async function recordNotification(tx: Tx, input: {
   tenantId: string;
   subscriptionId: string | null;
-  kind: "PRE_DUE" | "PAYMENT_FAILED" | "GRACE_EXPIRED" | "REACTIVATED";
+  kind: BillingNotificationKind;
   dueDate: Date;
   payload?: unknown;
 }): Promise<void> {
@@ -206,7 +207,7 @@ export async function handleInvoicePaid(
       ? new Date(event.periodEnd)
       : advancePeriod(periodStart, subscription.billingCycle);
 
-    const wasRestricted = subscription.status === "PAST_DUE" || subscription.status === "BLOCKED";
+    const wasRestricted = subscription.status !== "ACTIVE";
 
     const updated = await tx.tenantSubscription.update({
       where: { id: subscription.id },
@@ -326,6 +327,176 @@ export async function handleInvoicePaymentFailed(
     processed: true,
     tenantId: tenant.id,
     action: result.progressed ? "subscription_past_due" : "already_restricted",
+  };
+}
+
+/**
+ * Trial window finished. Paying plans enter PENDING_DUE ("Pendente") with the
+ * first invoice OPEN; free plans roll straight into a forever-ACTIVE state
+ * (nothing to collect). The invoice due date becomes `nextInvoiceDueAt`, so the
+ * dunning rule (DUE_REMINDER → overdue → grace) converges without extra code.
+ */
+export async function handleTrialEnded(
+  event: NormalizedBillingEvent,
+): Promise<BillingEventOutcome> {
+  const resolution = await loadResolution(event);
+  if (!resolution) {
+    return { eventId: event.providerEventId, type: event.type, processed: false, tenantId: null, action: "orphan" };
+  }
+  const { subscription, tenant } = resolution;
+  if (subscription.status !== "TRIAL") {
+    return { eventId: event.providerEventId, type: event.type, processed: true, tenantId: tenant.id, action: "noop" };
+  }
+
+  const dueDate = event.dueDate
+    ? new Date(event.dueDate)
+    : subscription.trialEndsAt ?? new Date();
+  const amountCents = event.amountCents ?? subscription.priceCents;
+  const paidPlan = subscription.plan.priceCents > 0;
+  const nextStatus: TenantStatus = paidPlan ? "PENDING_DUE" : "ACTIVE";
+
+  await runDbTx(async (tx) => {
+    const updated = await tx.tenantSubscription.update({
+      where: { id: subscription.id },
+      data: {
+        status: nextStatus,
+        nextInvoiceDueAt: dueDate,
+        trialEndsAt: dueDate,
+      },
+    });
+
+    if (paidPlan) {
+      await upsertInvoice(tx, {
+        tenantId: tenant.id,
+        subscriptionId: subscription.id,
+        amountCents,
+        status: "OPEN",
+        dueDate,
+      });
+    }
+
+    await syncTenantStatus(tx, tenant, nextStatus);
+
+    eventBus.emit("billing.subscription.pending_due", {
+      tenantId: tenant.id,
+      subscriptionId: updated.id,
+      amountCents,
+      dueDate: dueDate.toISOString(),
+    });
+  });
+
+  return {
+    eventId: event.providerEventId,
+    type: event.type,
+    processed: true,
+    tenantId: tenant.id,
+    action: paidPlan ? "subscription_pending_due" : "trial_ended_free",
+  };
+}
+
+/**
+ * Money returned. The matching invoice is voided (REFUNDED) and the period it
+ * covered is unpaid again → the subscription falls back to PAST_DUE (unless it
+ * is already hard-blocked or cancelled). The manual lockout is preserved by
+ * `syncTenantStatus`.
+ */
+export async function handlePaymentRefunded(
+  event: NormalizedBillingEvent,
+): Promise<BillingEventOutcome> {
+  const resolution = await loadResolution(event);
+  if (!resolution) {
+    return { eventId: event.providerEventId, type: event.type, processed: false, tenantId: null, action: "orphan" };
+  }
+  const { subscription, tenant } = resolution;
+  const amountCents = event.amountCents ?? subscription.priceCents;
+
+  const result = await runDbTx(async (tx) => {
+    const invoice = await upsertInvoice(tx, {
+      tenantId: tenant.id,
+      subscriptionId: subscription.id,
+      providerInvoiceId: event.providerInvoiceId,
+      amountCents,
+      status: "REFUNDED",
+      dueDate: event.dueDate ? new Date(event.dueDate) : new Date(),
+    });
+
+    if (subscription.status === "BLOCKED" || subscription.status === "CANCELLED") {
+      return { progressed: false };
+    }
+
+    const graceEndsAt = new Date(Date.now() + graceDays(subscription.plan) * DAY_MS);
+    const progressed = subscription.status !== "PAST_DUE";
+    await tx.tenantSubscription.update({
+      where: { id: subscription.id },
+      data: { status: "PAST_DUE", graceEndsAt, nextInvoiceDueAt: invoice.dueDate },
+    });
+    await syncTenantStatus(tx, tenant, "PAST_DUE");
+    await recordNotification(tx, {
+      tenantId: tenant.id,
+      subscriptionId: subscription.id,
+      kind: "PAYMENT_FAILED",
+      dueDate: invoice.dueDate,
+      payload: { amountCents, refunded: true, graceEndsAt: graceEndsAt.toISOString() },
+    });
+    eventBus.emit("billing.subscription.past_due", {
+      tenantId: tenant.id,
+      subscriptionId: subscription.id,
+      amountCents,
+      graceEndsAt: graceEndsAt.toISOString(),
+    });
+    return { progressed };
+  });
+
+  eventBus.emit("billing.invoice.refunded", {
+    tenantId: tenant.id,
+    subscriptionId: subscription.id,
+    invoiceId: event.providerInvoiceId ?? null,
+    amountCents,
+  });
+
+  return {
+    eventId: event.providerEventId,
+    type: event.type,
+    processed: true,
+    tenantId: tenant.id,
+    action: result.progressed ? "subscription_past_due" : "already_restricted",
+  };
+}
+
+/**
+ * A gateway issued an invoice (renewal or first). Record it idempotently; the
+ * subscription transition itself is left to the dunning rule (PENDING_DUE →
+ * overdue → PAST_DUE, then grace) so operator-triggered and provider-triggered
+ * invoices converge on the same lifecycle.
+ */
+export async function handleInvoiceOpened(
+  event: NormalizedBillingEvent,
+): Promise<BillingEventOutcome> {
+  const resolution = await loadResolution(event);
+  if (!resolution) {
+    return { eventId: event.providerEventId, type: event.type, processed: false, tenantId: null, action: "orphan" };
+  }
+  const { subscription, tenant } = resolution;
+  const amountCents = event.amountCents ?? subscription.priceCents;
+  const dueDate = event.dueDate ? new Date(event.dueDate) : new Date();
+
+  await runDbTx(async (tx) => {
+    await upsertInvoice(tx, {
+      tenantId: tenant.id,
+      subscriptionId: subscription.id,
+      providerInvoiceId: event.providerInvoiceId,
+      amountCents,
+      status: "OPEN",
+      dueDate,
+    });
+  });
+
+  return {
+    eventId: event.providerEventId,
+    type: event.type,
+    processed: true,
+    tenantId: tenant.id,
+    action: "invoice_opened",
   };
 }
 
@@ -545,6 +716,9 @@ function mapProviderStatus(status?: string): TenantStatus | null {
     case "trialing":
     case "incomplete":
       return "TRIAL";
+    case "pending":
+    case "awaiting_payment":
+      return "PENDING_DUE";
     default:
       return null;
   }

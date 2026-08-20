@@ -20,6 +20,8 @@ const simulateSchema = z
       "invoice.opened",
       "subscription.updated",
       "subscription.deleted",
+      "subscription.trial_ended",
+      "payment.refunded",
       "checkout.completed",
     ]),
     overrides: z.record(z.unknown()).optional(),

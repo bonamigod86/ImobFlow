@@ -33,6 +33,8 @@ datasource db {
 enum TenantStatus {
   TRIAL
   ACTIVE
+  /// Assinatura criada aguardando o primeiro pagamento (fatura OPEN no prazo).
+  PENDING_DUE
   PAST_DUE
   BLOCKED
   CANCELLED
@@ -196,8 +198,13 @@ enum PaymentInvoiceStatus {
 
 /// Dunning / account-lockout notification stages.
 enum BillingNotificationKind {
+  /// Aviso pré-vencimento (dias antes, configurável via env).
   PRE_DUE
+  /// Comunicação no dia do vencimento.
+  DUE_REMINDER
   PAYMENT_FAILED
+  /// Lembrete em atraso (meio da janela de carência).
+  LATE_REMINDER
   GRACE_EXPIRED
   REACTIVATED
 }

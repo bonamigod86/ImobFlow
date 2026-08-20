@@ -7,10 +7,13 @@ import type {
 } from "@/lib/billing/types";
 import {
   handleCheckoutCompleted,
+  handleInvoiceOpened,
   handleInvoicePaid,
   handleInvoicePaymentFailed,
+  handlePaymentRefunded,
   handleSubscriptionDeleted,
   handleSubscriptionUpdated,
+  handleTrialEnded,
 } from "@/lib/billing/state-machine";
 import { eventBus } from "@/lib/events/event-bus";
 import "../events/register";
@@ -174,6 +177,12 @@ function dispatch(event: NormalizedBillingEvent): Promise<BillingEventOutcome> {
       return handleInvoicePaid(event);
     case "invoice.payment_failed":
       return handleInvoicePaymentFailed(event);
+    case "invoice.opened":
+      return handleInvoiceOpened(event);
+    case "subscription.trial_ended":
+      return handleTrialEnded(event);
+    case "payment.refunded":
+      return handlePaymentRefunded(event);
     case "subscription.updated":
       return handleSubscriptionUpdated(event);
     case "subscription.deleted":
@@ -181,7 +190,7 @@ function dispatch(event: NormalizedBillingEvent): Promise<BillingEventOutcome> {
     case "checkout.completed":
       return handleCheckoutCompleted(event);
     default:
-      // invoice.opened / unhandled — nothing to transition, just acked.
+      // unhandled — nothing to transition, just acked.
       return Promise.resolve({
         eventId: event.providerEventId,
         type: event.type,

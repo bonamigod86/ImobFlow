@@ -109,6 +109,7 @@ interface LedgerEvent {
 const STATUS_CLASS: Record<string, string> = {
   ACTIVE: "status-ok",
   TRIAL: "status-ok",
+  PENDING_DUE: "status-warn",
   PAST_DUE: "status-warn",
   BLOCKED: "status-bad",
   CANCELLED: "status-bad",
@@ -147,7 +148,19 @@ export default function BillingAdminConsole({ user }: { user: { name: string; em
   const [busy, setBusy] = useState(false);
 
   const [provisionPlanCode, setProvisionPlanCode] = useState("");
-  const [scanResult, setScanResult] = useState<{ scan?: { preDueNotified: number; trialExpired: number; suspended: number; skippedSuspended: number }; highlightsExpired?: number } | null>(null);
+  const [scanResult, setScanResult] = useState<{
+    scan?: {
+      preDueNotified: number;
+      dueReminded: number;
+      trialExpired: number;
+      payableExpired: number;
+      lateReminded: number;
+      suspended: number;
+      skippedSuspended: number;
+    };
+    renewal?: { opened: number; alreadyOpen: number; skippedFree: number };
+    highlightsExpired?: number;
+  } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newPlan, setNewPlan] = useState({
     code: "",
@@ -239,7 +252,11 @@ export default function BillingAdminConsole({ user }: { user: { name: string; em
     setBusy(true);
     setError(null);
     try {
-      const res = await postJson<{ scan: { preDueNotified: number; trialExpired: number; suspended: number; skippedSuspended: number }; highlightsExpired: number }>("/api/admin/billing/scan");
+      const res = await postJson<{
+        scan: { preDueNotified: number; dueReminded: number; trialExpired: number; payableExpired: number; lateReminded: number; suspended: number; skippedSuspended: number };
+        renewal: { opened: number; alreadyOpen: number; skippedFree: number };
+        highlightsExpired: number;
+      }>("/api/admin/billing/scan");
       setScanResult(res);
       await loadAll();
     } catch (e) {
@@ -331,6 +348,36 @@ export default function BillingAdminConsole({ user }: { user: { name: string; em
     }
   }
 
+  async function changeTenantStatus(status: string, reason?: string) {
+    if (!selectedTenantId) return;
+    setBusy(true);
+    try {
+      await patchJson(`/api/admin/tenants/${selectedTenantId}`, { status, reason });
+      const d = await fetchJson<BillingDetail>(`/api/admin/billing/tenants/${selectedTenantId}`);
+      setDetail(d);
+      await loadAll();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao alterar situação.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function payOpenInvoice() {
+    if (!selectedTenantId) return;
+    setBusy(true);
+    try {
+      await postJson(`/api/admin/billing/tenants/${selectedTenantId}/pay`);
+      const d = await fetchJson<BillingDetail>(`/api/admin/billing/tenants/${selectedTenantId}`);
+      setDetail(d);
+      await loadAll();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao baixar fatura.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const s = snapshot;
 
   return (
@@ -369,9 +416,13 @@ export default function BillingAdminConsole({ user }: { user: { name: string; em
             {scanResult && (
               <p className="muted" style={{ marginBottom: "0.5rem" }}>
                 Varredura: {scanResult.scan?.preDueNotified ?? 0} pré-vencimento ·{" "}
-                {scanResult.scan?.trialExpired ?? 0} trials vencidos ·{" "}
+                {scanResult.scan?.dueReminded ?? 0} avisos no vencimento ·{" "}
+                {scanResult.scan?.trialExpired ?? 0} trials encerrados ·{" "}
+                {scanResult.scan?.payableExpired ?? 0} faturas vencidas ·{" "}
+                {scanResult.scan?.lateReminded ?? 0} lembretes em atraso ·{" "}
                 {scanResult.scan?.suspended ?? 0} suspensões ·{" "}
                 {scanResult.scan?.skippedSuspended ?? 0} suspensões puladas ·{" "}
+                renovação: {scanResult.renewal?.opened ?? 0} faturas abertas ·{" "}
                 {scanResult.highlightsExpired ?? 0} destaques expirados.
               </p>
             )}
@@ -537,6 +588,7 @@ export default function BillingAdminConsole({ user }: { user: { name: string; em
               <option value="">Todos</option>
               <option value="TRIAL">Trial</option>
               <option value="ACTIVE">Ativo</option>
+              <option value="PENDING_DUE">Pendente</option>
               <option value="PAST_DUE">Em atraso</option>
               <option value="BLOCKED">Bloqueado</option>
               <option value="CANCELLED">Cancelado</option>
@@ -645,8 +697,26 @@ export default function BillingAdminConsole({ user }: { user: { name: string; em
                 <button className="secondary" onClick={() => void simulate("invoice.payment_failed")} disabled={busy}>
                   Simular falha de pagamento
                 </button>
+                <button className="secondary" onClick={() => void simulate("subscription.trial_ended")} disabled={busy}>
+                  Simular fim do trial
+                </button>
+                <button className="secondary" onClick={() => void simulate("payment.refunded")} disabled={busy}>
+                  Simular reembolso
+                </button>
                 <button className="secondary" onClick={() => void simulate("subscription.deleted")} disabled={busy}>
                   Simular cancelamento
+                </button>
+                <button onClick={() => void payOpenInvoice()} disabled={busy}>
+                  Baixar fatura (auto-collect)
+                </button>
+              </div>
+
+              <div className="row" style={{ marginTop: "0.5rem" }}>
+                <button className="secondary" onClick={() => void changeTenantStatus("BLOCKED", "Bloqueio manual pelo MASTER")} disabled={busy}>
+                  Bloquear manualmente
+                </button>
+                <button className="secondary" onClick={() => void changeTenantStatus("ACTIVE")} disabled={busy || !detail.tenant.manualBlockedAt}>
+                  Desbloquear
                 </button>
               </div>
 

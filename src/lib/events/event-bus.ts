@@ -1,4 +1,4 @@
-import type { TenantStatus, UserRole } from "@prisma/client";
+import type { BillingNotificationKind, TenantStatus, UserRole } from "@prisma/client";
 
 /**
  * Typed domain event bus (in-process).
@@ -120,8 +120,32 @@ export interface DomainEventMap {
   "billing.dunning.notified": {
     tenantId: string;
     subscriptionId: string | null;
-    kind: "PRE_DUE" | "PAYMENT_FAILED" | "GRACE_EXPIRED" | "REACTIVATED";
+    kind: BillingNotificationKind;
     dueDate: string;
+  };
+  "billing.invoice.opened": {
+    tenantId: string;
+    subscriptionId: string;
+    amountCents: number;
+    dueDate: string;
+  };
+  "billing.invoice.refunded": {
+    tenantId: string;
+    subscriptionId: string;
+    invoiceId: string | null;
+    amountCents: number;
+  };
+  "billing.subscription.pending_due": {
+    tenantId: string;
+    subscriptionId: string;
+    amountCents: number;
+    dueDate: string;
+  };
+  "billing.invoice.autocollected": {
+    tenantId: string;
+    subscriptionId: string | null;
+    invoiceId: string;
+    amountCents: number;
   };
   "billing.highlight.activated": {
     tenantId: string;

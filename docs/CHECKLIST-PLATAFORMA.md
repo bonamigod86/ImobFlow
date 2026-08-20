@@ -557,6 +557,61 @@ de destaque, carência e trial. Os limites deixaram de ser apenas exibidos: são
 
 ---
 
+## Item 13 — Cobrança recorrente
+
+Status: **100% implementado**. Cobrança recorrente sem depender de gateway
+real: o worker diário bombeia a fatura do período seguinte, o pagamento local
+(auto-collect) roda o mesmo pipeline idempotente de webhook e a máquina de
+estados passou a cobrir `trial_ended`, `payment.refunded` e `invoice.opened`.
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 13.1 | Renovação automática (fatura do próximo período) | OK | `src/lib/billing/renewals.ts` → `runGlobalRenewalScan`: ACTIVE com `nextInvoiceDueAt` atingido recebe fatura OPEN do próximo ciclo (`providerInvoiceId "local:<sub>:<ts>"` único); plano free e fatura já aberta são pulados (idempotente) |
+| 13.2 | Confirmação de pagamento (plataforma sem gateway) | OK | `settleInvoiceAutomatically` (auto-collect) reabre o pipeline canônico (`auto-collect:<invoiceId>` no ledger) → assinatura ACTIVE, carência zerada, rollover do vencimento e créditos de destaque do período |
+| 13.3 | Máquina de estados ampliada | OK | `state-machine.ts` ganhou `handleTrialEnded`, `handlePaymentRefunded`, `handleInvoiceOpened`; `dispatch` em `billing-events.ts` roteia; `mapProviderStatus` mapeia `pending/awaiting_payment → PENDING_DUE` |
+| 13.4 | Estados do ciclo de vida | OK | Novo `TenantStatus.PENDING_DUE` (migração `20260820080000_tenant_pending_due_status`), rótulos pt-BR em `types.ts`, `dashboard/format.ts` e `components/admin/master/types.ts`, `tenantStatusSchema`; console MASTER com filtro "Pendente" |
+| 13.5 | Pagamento manual via console | OK | `POST /api/admin/billing/tenants/[id]/pay` (MASTER) baixa a fatura aberta mais antiga via auto-collect; `BillingAdminConsole` com botão "Baixar fatura (auto-collect)" e simulações de `subscription.trial_ended` e `payment.refunded` |
+
+## Item 14 — Inadimplência e bloqueio
+
+Status: **100% implementado**. Régua de cobrança completa: aviso
+pré-vencimento, comunicação no vencimento, promoção a "Vencida" com carência,
+lembretes em atraso recorrentes, suspensão automática reversível ao esgotar a
+carência e bloqueio/desbloqueio manual persistido (que um webhook de pagamento
+nunca desfaz).
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 14.1 | Aviso pré-vencimento | OK | `PRE_DUE` (janela `BILLING_PRE_DUE_NOTIFY_DAYS`) — já existente, mantido |
+| 14.2 | Comunicação no vencimento | OK | Novo `BillingNotificationKind.DUE_REMINDER` (migração `20260820070000_billing_dunning_reminders`) disparado no dia exato para ACTIVE/PENDING_DUE |
+| 14.3 | Triagem Pendente → Vencida | OK | Trial encerrado → `PENDING_DUE` com a primeira fatura OPEN; fatura vencida (`dueDate < now`) promove `PENDING_DUE`/`ACTIVE` → `PAST_DUE` + fatura `OVERDUE` + carência (`payableExpired`) |
+| 14.4 | Lembretes em atraso | OK | `LATE_REMINDER` recorrente a cada `BILLING_DUNNING_LATE_EVERY_DAYS` dias com âncora `dueDate + k*N` (idempotente por tenant+kind+dueDate) |
+| 14.5 | Suspensão automática reversível | OK | `graceEndsAt` esgotado → `Tenant.status=BLOCKED` (apenas status; dados preservados); switch `BILLING_AUTOSUSPEND_ENABLED`; bloqueio nunca aplicado a lockout manual; suspensão fora de transação interativa (evita timeout de 5s do Prisma em Postgres remoto) |
+| 14.6 | Bloqueio/desbloqueio manual | OK | `TenantAdminService.changeStatus` persiste `manualBlockedAt`+`blockReason` ao bloquear e limpa ao desbloquear; espelha a assinatura (bloqueio/cancelamento); guardrail: `invoice.paid` **não** desbloqueia bloqueio manual |
+| 14.7 | Painel MASTER | OK | `BillingAdminConsole` exibe carência real, badge de bloqueio manual e botões Bloquear/Desbloquear; `POST /api/admin/billing/scan` responde `{ renewal, scan, highlightsExpired }` com os contadores novos; `control.ts` usa `graceEndsAt` real da assinatura (antes hardcoded de 7 dias) |
+
+### Testes/smoke realizados (Itens 13/14)
+
+Foi usado o pipeline real em processo limpo (mesma stack de código/DB, sem cache
+do dev server):
+1. **Auto-collect (plataforma sem gateway)** — delta (BLOCKED) teve a fatura
+   baixada via `settleInvoiceAutomatically` → assinatura e tenant **ACTIVE**,
+   carência zerada, `nextInvoiceDueAt` rolado +1 ciclo e fatura **PAID**.
+2. **Bloqueio manual é impenetrável a webhook** — `changeStatus(BLOCKED, "smoke")`
+   persistiu `manualBlockedAt`; `invoice.paid` simulado **não** desbloqueou
+   (tenant seguiu BLOCKED); `changeStatus(ACTIVE)` desbloqueou e limpou o lockout.
+3. **Trial free → Ativo** — `subscription.trial_ended` na norton (plano Free) →
+   **ACTIVE** sem geração de fatura.
+4. **Vencida → reativação** — acme (PAST_DUE) com `invoice.paid` → **ACTIVE**,
+   carência zerada e rollover para o próximo ciclo.
+5. **Varredura real** — `runGlobalBillingScan` na base dev suspendeu delta ao
+   esgotar a carência (`suspended: 1`) e emitiu `LATE_REMINDER`; `runGlobalRenewalScan`
+   mantém uma fatura por período (idempotente).
+6. `npx tsc --noEmit` limpo, `next lint` limpo, `vitest run` **220/220**
+   (contrato de scan reescrito em `dunning.test.ts` + novos `renewals.test.ts`).
+
+---
+
 ## Correções aplicadas após a auditoria (Item 5)
 
 1. **Duplicar conflitava no `externalCode`** — `duplicateProperty` copiava o
@@ -652,7 +707,7 @@ de destaque, carência e trial. Os limites deixaram de ser apenas exibidos: são
 
 - `npx tsc --noEmit` — sem erros
 - `next lint` — sem warnings ou erros
-- `vitest run` — 210/210 testes passando
+- `vitest run` — 220/220 testes passando
 - Testes de segregação de dados (tenant A nunca lê dados de B) — verdes,
   incluindo as rotas públicas de itens 3 e 4
 - Seed demo: KPIs do painel populados (views, visitas, WhatsApp) de forma idempotente
@@ -671,3 +726,7 @@ de destaque, carência e trial. Os limites deixaram de ser apenas exibidos: são
 - Item 12 (planos/assinaturas): criação e edição de planos (todos os campos) e
   aplicação do limite de imóveis (POST/duplicar) validados via HTTP, com plano
   e dados de teste removidos ao final
+- Itens 13/14 (cobrança recorrente + inadimplência/bloqueio): renovação
+  automática, auto-collect, trial→pendente→vencida→bloqueada, lembretes no
+  vencimento/em atraso e o bloqueio manual impenetrável a webhook validados com
+  o pipeline real (ledger + state machine)

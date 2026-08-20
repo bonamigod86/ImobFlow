@@ -264,7 +264,7 @@ export const routingRulePatchSchema = routingRuleSchema.partial();
 export type RoutingRulePatchInput = z.infer<typeof routingRulePatchSchema>;
 
 export const tenantStatusSchema = z.object({
-  status: z.enum(["TRIAL", "ACTIVE", "PAST_DUE", "BLOCKED", "CANCELLED"]),
+  status: z.enum(["TRIAL", "ACTIVE", "PENDING_DUE", "PAST_DUE", "BLOCKED", "CANCELLED"]),
   reason: z.string().trim().max(1000).optional(),
 });
 
