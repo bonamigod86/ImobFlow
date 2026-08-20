@@ -36,6 +36,7 @@ const PUBLIC_ROUTES = new Set([
   "public/leads",
   "public/listings",
   "public/financial-leads",
+  "register",
 ]);
 
 const ROUTES_ROOT = path.resolve(process.cwd(), "src/app/api");

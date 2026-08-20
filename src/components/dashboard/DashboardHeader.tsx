@@ -1,6 +1,7 @@
 "use client";
 
 import type { TenantStatus, UserRole } from "@prisma/client";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { DeveloperDetailsDialog } from "@/components/dashboard/DeveloperDetails";
 import SignOutButton from "@/components/SignOutButton";
@@ -41,6 +42,13 @@ export function DashboardHeader({
             </>
           )}
           {planName && <Badge variant="default">{planName}</Badge>}
+        </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          {tenant && (
+            <Link href="/dashboard/profile" className="text-ink-400 transition-colors hover:text-brand-600">
+              Perfil
+            </Link>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-1.5">

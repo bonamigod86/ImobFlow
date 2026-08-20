@@ -242,3 +242,96 @@ export const queryPageSchema = z.object({
 export const queuedJobDataSchema = z.object({
   tenantId: z.string().min(1),
 });
+
+// -----------------------------------------------------------------------------
+// Item 3 — Cadastro de imobiliárias e corretores
+// -----------------------------------------------------------------------------
+
+/** Empty-to-null normalizer so optional inputs clear columns instead of staying "". */
+function emptyToNull<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? null : v), schema.nullable().optional());
+}
+
+const cpfCnpj = z
+  .string()
+  .trim()
+  .regex(/^(\d{11}|\d{14}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\d{3}\.\d{3}\.\d{3}-\d{2})$/, {
+    message: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos).",
+  })
+  .transform((v) => v.replace(/\D/g, ""))
+  .refine((v) => v.length === 11 || v.length === 14, "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos).");
+
+const phoneLike = (label: string) =>
+  z.string().trim().min(8, `${label} inválido.`).max(20, `${label} muito longo.`);
+
+const socialLinksSchema = z
+  .object({
+    instagram: emptyToNull(z.string().trim().max(240)),
+    facebook: emptyToNull(z.string().trim().max(240)),
+    linkedin: emptyToNull(z.string().trim().max(240)),
+    youtube: emptyToNull(z.string().trim().max(240)),
+  })
+  .partial()
+  .optional()
+  .default({});
+
+/** Self-service account creation — imobiliária (AGENCY) ou corretor autônomo (BROKER). */
+export const registerSchema = z.object({
+  type: z.enum(["AGENCY", "BROKER"], { required_error: "Selecione o tipo de conta." }),
+  displayName: z.string().trim().min(2, "Informe o nome / nome fantasia.").max(120),
+  legalName: emptyToNull(z.string().trim().min(2).max(160)),
+  document: cpfCnpj,
+  creci: emptyToNull(z.string().trim().max(30)),
+  responsibleName: z.string().trim().min(2, "Informe o responsável.").max(160),
+  phone: phoneLike("Telefone"),
+  whatsapp: emptyToNull(phoneLike("WhatsApp")),
+  email: z.string().trim().email("Informe um e-mail válido.").max(255),
+  password: z.string().min(8, "A senha deve ter ao menos 8 caracteres.").max(MAX_PASSWORD_LENGTH),
+  address: emptyToNull(z.string().trim().max(240)),
+  city: emptyToNull(z.string().trim().max(120)),
+  state: emptyToNull(z.string().trim().regex(/^[A-Za-z]{2}$/, "UF deve ter 2 letras.")),
+  description: emptyToNull(z.string().trim().max(1000)),
+  website: emptyToNull(z.string().trim().url("Informe uma URL válida.").max(240)),
+  socialLinks: socialLinksSchema,
+});
+
+export type RegisterInput = z.infer<typeof registerSchema>;
+
+/** Editable tenant profile (PATCH-friendly partial). */
+export const tenantProfileSchema = z.object({
+  displayName: z.string().trim().min(2).max(120),
+  legalName: emptyToNull(z.string().trim().max(160)),
+  document: cpfCnpj,
+  creci: emptyToNull(z.string().trim().max(30)),
+  responsibleName: z.string().trim().min(2).max(160),
+  phone: phoneLike("Telefone"),
+  whatsapp: emptyToNull(phoneLike("WhatsApp")),
+  contactEmail: emptyToNull(z.string().trim().email("Informe um e-mail válido.").max(255)),
+  address: emptyToNull(z.string().trim().max(240)),
+  city: emptyToNull(z.string().trim().max(120)),
+  state: emptyToNull(z.string().trim().regex(/^[A-Za-z]{2}$/, "UF deve ter 2 letras.")),
+  logoUrl: emptyToNull(z.string().trim().max(5000)),
+  description: emptyToNull(z.string().trim().max(1000)),
+  website: emptyToNull(z.string().trim().url("Informe uma URL válida.").max(240)),
+  socialLinks: socialLinksSchema,
+});
+
+/** Broker profile attached to the OWNER (PATCH-friendly). */
+export const brokerProfileSchema = z.object({
+  name: z.string().trim().min(2).max(160),
+  document: cpfCnpj,
+  creci: emptyToNull(z.string().trim().max(30)),
+  phone: emptyToNull(phoneLike("Telefone")),
+  whatsapp: emptyToNull(phoneLike("WhatsApp")),
+  photoUrl: emptyToNull(z.string().trim().max(5000)),
+});
+
+export type TenantProfileInput = z.infer<typeof tenantProfileSchema>;
+export type BrokerProfileInput = z.infer<typeof brokerProfileSchema>;
+
+/** Combined PATCH payload for /api/tenant/profile. */
+export const tenantProfilePatchSchema = z.object({
+  tenant: tenantProfileSchema.partial().optional(),
+  broker: brokerProfileSchema.partial().optional(),
+});
+export type TenantProfilePatchInput = z.infer<typeof tenantProfilePatchSchema>;

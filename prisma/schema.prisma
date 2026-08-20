@@ -38,6 +38,13 @@ enum TenantStatus {
   CANCELLED
 }
 
+/// Initial account profile — a real-estate agency (imobiliária) or an
+/// autonomous broker (corretor autônomo).
+enum TenantType {
+  AGENCY
+  BROKER
+}
+
 enum UserRole {
   MASTER
   OWNER
@@ -265,8 +272,30 @@ model Tenant {
   name      String
   slug      String       @unique // stable, lower-case; used for subdomain resolution
   status    TenantStatus @default(TRIAL)
+  type      TenantType   @default(AGENCY)
   planId    String
   plan      Plan         @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  // Registration / public profile (Cadastro de imobiliárias e corretores).
+  /// Razão social (trade name lives in `name`); CNPJ holder for AGENCY.
+  legalName       String?
+  /// CPF (11) or CNPJ (14) digits only.
+  document        String?
+  /// CRECI of the agency/broker responsible.
+  creci           String?
+  responsibleName String?
+  phone           String?
+  whatsapp        String?
+  contactEmail    String?
+  address         String?
+  city            String?
+  state           String? // UF — 'SP', 'RJ', ...
+  logoUrl         String?
+  description     String?
+  website         String?
+  /// Social profiles, e.g. { instagram, facebook, linkedin, youtube }.
+  socialLinks     Json?
+
   /// Manual (ops-initiated) lockout — independent of the billing state machine.
   /// When set, the tenant is BLOCKED regardless of subscription status.
   manualBlockedAt DateTime?
@@ -302,6 +331,7 @@ model Tenant {
   webhookDeliveryAttempts WebhookDeliveryAttempt[]
 
   @@index([status])
+  @@index([type])
   @@index([planId])
   @@index([manualBlockedAt])
 }
@@ -492,6 +522,11 @@ model User {
   email        String    @unique // one identity across the platform (login keys)
   /// Contact phone (broker WhatsApp on the public portal listings).
   phone        String?
+  /// Personal profile (CPF/CRECI/photo) — mirrors the broker dossier.
+  document     String?
+  creci        String?
+  photoUrl     String?
+  whatsapp     String?
   passwordHash String // argon2/bcrypt hash — never a plaintext
   role         UserRole  @default(AGENT)
   isActive     Boolean   @default(true)

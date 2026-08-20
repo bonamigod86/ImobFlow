@@ -43,6 +43,12 @@ export function SiteHeader() {
             <span className="hidden sm:inline">Buscar</span>
           </Link>
           <Link
+            href="/register"
+            className="inline-flex items-center rounded-lg bg-slate-100 px-3.5 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-200"
+          >
+            Criar conta
+          </Link>
+          <Link
             href="/login"
             className="inline-flex items-center rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
           >

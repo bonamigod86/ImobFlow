@@ -139,9 +139,31 @@ async function main(): Promise<void> {
   console.log("MASTER:", "admin@saas.local", "/", SEED_PASSWORD);
 
   // --- Demo tenants ---------------------------------------------------------
-  const acme = await seedTenant("acme", "ACME Imóveis", pro, "ACTIVE", passwordHash);
-  const norton = await seedTenant("norton", "Norton Brokers", free, "TRIAL", passwordHash);
-  const delta = await seedTenant("delta", "Delta Intermediações", enterprise, "PAST_DUE", passwordHash);
+const acme = await seedTenant(
+  "acme",
+  "ACME Imóveis",
+  pro,
+  "ACTIVE",
+  passwordHash,
+  {
+    type: "AGENCY",
+    legalName: "ACME Imóveis Ltda",
+    document: "11222333000181",
+    creci: "CRECI-SP 12345-F",
+    responsibleName: "Carlos Acmé",
+    phone: "+55 11 97777-1111",
+    whatsapp: "+55 11 97777-1111",
+    contactEmail: "contato@acmeimoveis.com.br",
+    address: "Av. Paulista, 1000, cj 151",
+    city: "São Paulo",
+    state: "SP",
+    description: "Imobiliária boutique no centro de São Paulo há 15 anos.",
+    website: "https://acmeimoveis.com.br",
+    socialLinks: { instagram: "https://instagram.com/acmeimoveis", linkedin: "https://linkedin.com/company/acme" },
+  },
+);
+const norton = await seedTenant("norton", "Norton Brokers", free, "TRIAL", passwordHash, { type: "BROKER" });
+const delta = await seedTenant("delta", "Delta Intermediações", enterprise, "PAST_DUE", passwordHash, { type: "AGENCY" });
 
   // --- Phase 4: lead engine destinations + routing (platform-owned) ---------
   const cred = await prisma.webhookEndpoint.upsert({
@@ -223,11 +245,64 @@ async function seedTenant(
   plan: { id: string },
   status: "ACTIVE" | "TRIAL" | "PAST_DUE" | "BLOCKED",
   passwordHash: string,
+  profile?: {
+    type?: "AGENCY" | "BROKER";
+    legalName?: string;
+    document?: string;
+    creci?: string;
+    responsibleName?: string;
+    phone?: string;
+    whatsapp?: string;
+    contactEmail?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    description?: string;
+    website?: string;
+    socialLinks?: Record<string, string>;
+  },
 ): Promise<{ id: string; slug: string; name: string }> {
   const tenant = await prisma.tenant.upsert({
     where: { slug },
-    update: { name, planId: plan.id, status },
-    create: { slug, name, planId: plan.id, status },
+    update: {
+      name,
+      planId: plan.id,
+      status,
+      type: profile?.type ?? "AGENCY",
+      legalName: profile?.legalName,
+      document: profile?.document,
+      creci: profile?.creci,
+      responsibleName: profile?.responsibleName,
+      phone: profile?.phone,
+      whatsapp: profile?.whatsapp,
+      contactEmail: profile?.contactEmail,
+      address: profile?.address,
+      city: profile?.city,
+      state: profile?.state,
+      description: profile?.description,
+      website: profile?.website,
+      socialLinks: profile?.socialLinks,
+    },
+    create: {
+      slug,
+      name,
+      planId: plan.id,
+      status,
+      type: profile?.type ?? "AGENCY",
+      legalName: profile?.legalName,
+      document: profile?.document,
+      creci: profile?.creci,
+      responsibleName: profile?.responsibleName,
+      phone: profile?.phone,
+      whatsapp: profile?.whatsapp,
+      contactEmail: profile?.contactEmail,
+      address: profile?.address,
+      city: profile?.city,
+      state: profile?.state,
+      description: profile?.description,
+      website: profile?.website,
+      socialLinks: profile?.socialLinks,
+    },
   });
 
   const users: Array<[string, string, "OWNER" | "MANAGER" | "AGENT" | "RECEPTIONIST", string | null]> = [

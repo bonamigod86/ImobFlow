@@ -29,6 +29,7 @@ function isPublicPath(pathname: string): boolean {
   return (
     pathname === "/" ||
     pathname === "/login" ||
+    pathname === "/register" ||
     pathname === "/reset-password" ||
     // Public portal (tenant listing + property detail) — no auth required.
     pathname === "/imoveis" ||
@@ -37,6 +38,7 @@ function isPublicPath(pathname: string): boolean {
     pathname === "/api/auth/login" ||
     pathname === "/api/auth/forgot-password" ||
     pathname === "/api/auth/reset-password" ||
+    pathname === "/api/register" ||
     pathname === "/api/health" ||
     // Public lead intake (portal forms) — auth comes from its own rate limit.
     pathname.startsWith("/api/public/") ||

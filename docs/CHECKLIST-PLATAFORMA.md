@@ -1,4 +1,4 @@
-# Saas Imob — Checklist de Implementação (Portal Público)
+# Saas Imob — Checklist de Implementação
 
 > Documento de rastreabilidade dos checklists passados pelo cliente. Cada item
 > abaixo foi auditado no código e **está implementado e funcional** na branch
@@ -50,7 +50,56 @@ Cada filtro atualiza a query string — páginas compartilháveis e indexáveis:
 
 ---
 
-## Correções aplicadas após a auditoria
+## Item 3 — Cadastro de imobiliárias e corretores
+
+Status: **100% implementado**. Divergências identificadas na auditoria foram
+corrigidas e o fluxo foi testado de ponta a ponta via HTTP.
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 3.1 | Perfil de imobiliária (AGENCY) | OK | `TenantType` enum + campos em `Tenant` (`legalName`, `document`, `creci`, `responsibleName`, etc.) |
+| 3.2 | Perfil de corretor autônomo (BROKER) | OK | Mesmo enum; `User.document`/`creci`/`photoUrl`/`whatsapp` recebem os dados do corretor |
+| 3.3 | Perfil Master (super-admin) | OK | Role `MASTER` (administradora); não possui tenant de cadastro — sem página de perfil próprio |
+| 3.4 | Campos de cadastro completos | OK | Nome fantasia, razão social, CPF/CNPJ (máscara via label), CRECI, responsável, telefone, WhatsApp, e-mail, endereço, cidade, UF, descrição, site, redes sociais |
+| 3.5 | Cadastro público (self-service) | OK | `POST /api/register` + `/register` (`RegisterForm.tsx`): seleção AGENCY/BROKER, validação Zod, rate limit por IP |
+| 3.6 | Assinatura TRIAL automática | OK | `registerTenant` cria tenant `TRIAL` + `tenantSubscription` TRIAL (plano ativo mais barato, `trialDays` padrão 14) |
+| 3.7 | Isolamento de dados por inquilino | OK | Tenant novo é linha independente; a extensão ORM com falha-fechada escopa toda query (teste de segregação verde) |
+| 3.8 | Auto-login pós-cadastro | OK | Sessão JWT emitida (cookie `saas_session`, role OWNER) e redirecionamento para `/dashboard` |
+| 3.9 | Edição de perfil | OK | `GET/PATCH /api/tenant/profile` + `/dashboard/profile` (`TenantProfileForm.tsx`); whitelist de campos, `displayName`→`name` |
+| 3.10 | Logo / foto | OK | Upload via FileReader (Data URL, ≤1 MB, tipo imagem) no formulário de perfil; persistido em `logoUrl`/`photoUrl` |
+| 3.11 | Redes sociais | OK | Campos Instagram/Facebook/LinkedIn; valores vazios/nulos removidos antes de persistir |
+| 3.12 | E-mail de boas-vindas | OK | `notifyWelcomeAccount` disparado (fila/console, não-bloqueante) após o cadastro |
+| 3.13 | Auditoria do ciclo de conta | OK | `TENANT_REGISTERED` e `TENANT_PROFILE_UPDATED` em `src/lib/audit/actions.ts` |
+
+### Testes manuais realizados (via HTTP)
+
+1. `POST /api/register` (AGENCY, CNPJ, com site) → **201**, tenant `TRIAL`,
+   slug gerado `imobiliaria-teste-smoke`, cookie de sessão OWNER emitido.
+2. `GET /api/tenant/profile` com a sessão → retorna dados completos do tenant
+   + owner (telefone, whatsapp, CRECI, redes sociais).
+3. `PATCH /api/tenant/profile` → atualizou telefone/whatsapp/descrição do tenant
+   e telefone/whatsapp/CRECI do owner; UF normalizada para maiúsculas.
+4. `POST /api/register` com e-mail duplicado → **409 `EMAIL_TAKEN`** com mensagem
+   em pt-BR.
+5. Dados de teste removidos ao final (tenant e usuários deletados em cascata).
+
+---
+
+## Correções aplicadas após a auditoria (Item 3)
+
+1. **Middleware bloqueando o cadastro** — `/register` e `/api/register` não
+   estavam no whitelist público (`src/middleware.ts`), respondendo 401; foram
+   adicionados.
+2. **`displayName` vs `name`** — o formulário de perfil enviava `displayName`;
+   `updateProfile` esperava `name`; o serviço passou a mapear `displayName → name`.
+3. **`socialLinks`/valores nulos** — postos vazios/null eram persistidos no JSON;
+   agora são removidos antes do salvamento no registro e na atualização.
+4. **Rota pública em teste de segregação** — `register` adicionado a
+   `PUBLIC_ROUTES` (`segregation-audit.test.ts`).
+
+---
+
+## Correções aplicadas após a auditoria (Item 2)
 
 1. **Vídeos** — o repositório público passou a expor mídias `VIDEO` (`PublicProperty.videos`)
    e o PDP renderiza `VideoGallery` com poster da capa (`preload="none"` para performance).
@@ -75,4 +124,4 @@ Cada filtro atualiza a query string — páginas compartilháveis e indexáveis:
 - `next lint` — sem warnings ou erros
 - `vitest run` — 208/208 testes passando
 - `next build` — build de produção OK (inclui `/favoritos` e `/api/public/listings`)
-- Testes de segregação de dados (tenant A nunca lê dados de B) — verdes
+- Testes de segregação de dados (tenant A nunca lê dados de B) — verdes, incluindo as rotas de item 3
