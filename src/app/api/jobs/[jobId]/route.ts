@@ -12,16 +12,23 @@ import type { JobData } from "@/lib/queues/types";
  * requesting tenant (guards cross-tenant reads via job.data.tenantId).
  *
  * jobId format:  lead-routing:<leadId>  |  webhook:<integrationId>:<eventId>
+ *                import:<batchId>       |  media:<mediaId>
  */
 
-type Params = { params: { id: string } };
+type Params = { params: { jobId: string } };
+
+function queueForJobId(jobId: string): QueueName {
+  if (jobId.startsWith("webhook:")) return QueueName.WEBHOOK_TRANSMISSION;
+  if (jobId.startsWith("import:")) return QueueName.PROPERTY_IMPORT;
+  if (jobId.startsWith("media:")) return QueueName.MEDIA_PROCESSING;
+  return QueueName.LEAD_ROUTING;
+}
 
 export const GET = withApiRoute(ACTIONS.LEADS_READ, async (ctx, _req, params) => {
-  const jobId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const jobId = Array.isArray(params.jobId) ? params.jobId[0] : params.jobId;
   if (!jobId) return fail(400, "BAD_REQUEST", "jobId is required.");
 
-  const queueName =
-    jobId.startsWith("webhook:") ? QueueName.WEBHOOK_TRANSMISSION : QueueName.LEAD_ROUTING;
+  const queueName = queueForJobId(jobId);
 
   const queue = QueueManager.get<JobData>(queueName);
   const job = await queue.getJob(jobId);

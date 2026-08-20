@@ -11,21 +11,23 @@ import { QueueName, type QueueName as QueueNameType } from "@/lib/queues/names";
  * to integrations/delivery managers (MASTER/OWNER/MANAGER via RBAC).
  */
 
-type Params = { params: { id: string } };
+type Params = { params: { jobId: string } };
 
 const QUEUE_BY_NAME: Record<string, QueueNameType> = {
   [QueueName.LEAD_ROUTING]: QueueName.LEAD_ROUTING,
   [QueueName.WEBHOOK_TRANSMISSION]: QueueName.WEBHOOK_TRANSMISSION,
+  [QueueName.PROPERTY_IMPORT]: QueueName.PROPERTY_IMPORT,
+  [QueueName.MEDIA_PROCESSING]: QueueName.MEDIA_PROCESSING,
 };
 
 export const POST = withApiRoute(ACTIONS.INTEGRATIONS_MANAGE, async (ctx, req, params) => {
-  const dlqJobId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const dlqJobId = Array.isArray(params.jobId) ? params.jobId[0] : params.jobId;
   if (!dlqJobId) return fail(400, "BAD_REQUEST", "dlq jobId is required.");
 
   const body = await req.json().catch(() => ({}));
   const originalQueue = QUEUE_BY_NAME[body.queueName as string];
   if (!originalQueue) {
-    return fail(400, "BAD_REQUEST", "Unknown queueName. Use one of: lead-routing-queue, webhook-transmission-queue.");
+    return fail(400, "BAD_REQUEST", "Unknown queueName. Use one of: lead-routing-queue, webhook-transmission-queue, property-import-queue, media-processing-queue.");
   }
 
   // Ensure the parked meta belongs to the requesting tenant before replay.

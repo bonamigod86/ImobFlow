@@ -1,11 +1,9 @@
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
 import { ACTIONS } from "@/lib/rbac/actions";
 import { withApiRoute } from "@/lib/http/route-wrapper";
 import { ok, fail } from "@/lib/http/errors";
 import { prisma } from "@/lib/prisma/client";
 import { ImportEngine } from "@/lib/imports/import-engine";
-import { parseCsv, parseJson, parseXml } from "@/lib/imports/parsers";
 import { AuditService } from "@/lib/audit/audit-service";
 import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 
@@ -21,10 +19,6 @@ import { AUDIT_ACTIONS } from "@/lib/audit/actions";
  * Lists the tenant's import history with live status + counters.
  */
 
-type RouteParams = Record<string, string | string[] | undefined>;
-
-type FileKind = "XML" | "CSV" | "JSON";
-
 const fileKindSchema = z.object({
   format: z.enum(["xml", "csv", "json"]).default("csv"),
   source: z
@@ -34,10 +28,6 @@ const fileKindSchema = z.object({
 });
 
 const MAX_PAYLOAD_BYTES = 20 * 1024 * 1024; // 20MB raw text
-
-function detectKind(format: string): FileKind {
-  return format.toUpperCase() as FileKind;
-}
 
 export const POST = withApiRoute(ACTIONS.PROPERTIES_CREATE, async (ctx, req) => {
   const url = new URL(req.url);
@@ -52,48 +42,25 @@ export const POST = withApiRoute(ACTIONS.PROPERTIES_CREATE, async (ctx, req) => 
     return fail(413, "PAYLOAD_TOO_LARGE", `Import payload exceeds ${MAX_PAYLOAD_BYTES / (1024 * 1024)}MB.`);
   }
 
-  const kind = detectKind(meta.format);
-  const parsed =
-    kind === "XML" ? parseXml(raw)
-    : kind === "JSON" ? parseJson(raw)
-    : parseCsv(raw);
-
-  const validRows = parsed.rows.filter((r) => r.ok).map((r) => r.data);
-  const parseErrors = parsed.rows.filter((r) => !r.ok).map((r) => ({ index: r.index, reason: r.errors }));
-
-  // Persist the batch with parse-time errors + valid rows embedded for the
-  // worker to replay. Valid rows are stored compactly in `errors` payload
-  // (rebuild via a dedicated column is unnecessary for Phase 2).
-  const errorsPayload = { rows: validRows, errors: parseErrors } as unknown as Prisma.InputJsonValue;
-  const batch = await prisma.importBatch.create({
-    data: {
-      tenantId: ctx.tenantId!,
-      source: meta.source,
-      fileKind: kind,
-      fileName: meta.fileName ?? null,
-      status: "QUEUED",
-      totalRows: parsed.total,
-      importedRows: 0,
-      updatedRows: 0,
-      skippedRows: 0,
-      failedRows: parsed.invalid,
-      errors: errorsPayload,
-    } as Prisma.ImportBatchUncheckedCreateInput,
+  const { batchId, jobId, parsed } = await ImportEngine.submit({
+    tenantId: ctx.tenantId!,
+    raw,
+    format: meta.format,
+    source: meta.source,
+    fileName: meta.fileName,
   });
-
-  const jobId = await ImportEngine.enqueue(batch.id);
 
   AuditService.logAsync({
     action: AUDIT_ACTIONS.PROPERTY_CREATED,
     entity: "ImportBatch",
-    entityId: batch.id,
+    entityId: batchId,
     tenantId: ctx.tenantId,
     userId: ctx.userId,
-    details: { kind, source: meta.source, total: parsed.total, valid: parsed.valid, jobId },
+    details: { kind: meta.format.toUpperCase(), source: meta.source, total: parsed.total, valid: parsed.valid, jobId },
   });
 
   return ok(
-    { batch: { id: batch.id, status: batch.status }, summary: { ...parsed }, jobId },
+    { batch: { id: batchId, status: "QUEUED" }, summary: { ...parsed }, jobId },
     202,
   );
 });

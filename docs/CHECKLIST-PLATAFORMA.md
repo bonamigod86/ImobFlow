@@ -158,6 +158,66 @@ galeria de mídia).
 
 ---
 
+## Item 6 — Importação e sincronização de imóveis
+
+Status: **100% implementado**. Divergências identificadas na auditoria foram
+corrigidas (detalhes na seção "Correções" ao final).
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 6.1 | Importação via REST | OK | `POST /api/imports?format=csv\|xml\|json` (corpo cru ≤ 20 MB, autenticado) |
+| 6.2 | Importação por webhooks/arquivo | OK | XML (VivaReal/ZAP), CSV e JSON + `POST /api/properties/sync` (ingestão por callback/API) |
+| 6.3 | Processamento em lote (assíncrono) | OK | `ImportBatch` persistido + fila `property-import-queue` (BullMQ); fail-open síncrono sem Redis |
+| 6.4 | Dedupe e atualização por código | OK | `(tenantId, externalCode)` com fallback `(tenantId, code)`; reenviar catálogo → `UPDATED` idempotente, `slug` público estável |
+| 6.5 | Sincronização de status | OK | Coluna `status` aplicada no upsert (`ACTIVE/INACTIVE/SOLD/RENTED`) |
+| 6.6 | Resultado e erros por linha | OK | `GET /api/imports` (histórico) e `GET /api/imports/{id}` (contadores + erros ≤ 200) |
+| 6.7 | Resiliência/observabilidade | OK | Retry com backoff + DLQ + `POST …/replay`; `GET /api/jobs/import:{batchId}` |
+| 6.8 | Documentação | OK | `docs/API_AND_WEBHOOK_SPECIFICATION.md` §2.6 e `docs/ARCHITECTURE_AND_DATABASE_MANUAL.md` |
+
+### Testes manuais realizados (via HTTP)
+
+1. `POST /api/imports?format=json&source=REST_API` (2 imóveis novos) → **202**,
+   lote `COMPLETED` com `importedRows: 2`.
+2. Reenvio do mesmo JSON com `status: RENTED` e `areaM2: 100` → **202**, lote
+   `COMPLETED` com `updatedRows: 2`; imóvel `IMP-JSON-1` passou para
+   `status=RENTED` e `area=100` com o `slug` público **estável** (idempotência +
+   sincronização de status).
+3. Import CSV (source `VIVA_REAL`) com colunas `areaM2` e `isFurnished` → 2/2
+   válidos; `area: 320`, `isFurnished: true`, `status: SOLD` aplicados.
+4. Import XML (source `ZAP`) estilo `<lista><imovel>` com `codigoImovel` → 1/1
+   válido; `externalCode: SYNC-XML-001` extraído via alias.
+5. `POST /api/properties/sync?format=json&source=REST_API` (ingestão por API) →
+   **202** e lote `COMPLETED`.
+6. `GET /api/imports` → histórico com 4 lotes `COMPLETED` e contadores corretos.
+7. `GET /api/jobs/import:{batchId}` → com Redis ativo expõe o estado do job; em
+   dev local (fila indisponível) retorna **404** pois o lote já foi processado
+   de forma síncrona fail-open (`jobId` `sync:{batchId}`).
+8. Limpeza: os 6 imóveis de teste (`IMP-*`, `SYNC-*`) excluídos após a validação.
+
+---
+
+## Correções aplicadas após a auditoria (Item 6)
+
+1. **Observabilidade de jobs quebrada** — `[jobId]/route.ts` e
+   `[jobId]/replay/route.ts` liam `params.id` num segmento de rota `[jobId]`
+   (o parâmetro nunca vinha → `jobId is required.`); corrigido para
+   `params.jobId` (exposto pelo smoke test do item 6).
+2. **Alias `areaM2` ausente** — CSV/JSON com a coluna `areaM2` (e variações
+   `area_m2`/`aream2`) não mapeava para `area`; aliases adicionados em `parsers.ts`.
+3. **`POST /api/properties/sync` inexistente** — criado endpoint dedicado de
+   sincronização via API/webhook reutilizando o pipeline de import
+   (`ImportEngine.submit`), com `source` padrão `REST_API`.
+4. **Ingestão fragmentada** — REST/webhook/portal agora convergem em
+   `ImportEngine.submit` (parse → `ImportBatch` → enqueue), garantindo semântica
+   idêntica de dedupe/status entre formatos e origens.
+5. **Fila indisponível derrubava o import** — `enqueue()` cai para processamento
+   síncrono fail-open com `jobId` `sync:{batchId}`, mantendo o fluxo em dev local.
+6. **Docs divergentes** — `API_AND_WEBHOOK_SPECIFICATION.md` §2.4 ampliada
+   (media, featured, sync, bytes, primary) e nova §2.6 documentando o modelo de
+   processamento, dedupe, sync de status, colunas/aliases e exemplo CSV.
+
+---
+
 ## Correções aplicadas após a auditoria (Item 5)
 
 1. **Duplicar conflitava no `externalCode`** — `duplicateProperty` copiava o
@@ -259,3 +319,5 @@ galeria de mídia).
 - Seed demo: KPIs do painel populados (views, visitas, WhatsApp) de forma idempotente
 - Item 5 (imóveis): CRUD completo, duplicar, publicar/ocultar, vender/alugar,
   destaque e galeria de mídia (com fallback local) validados via HTTP
+- Item 6 (importação/sincronização): CSV/XML/JSON e `/api/properties/sync` com
+  dedupe, atualização idempotente e sync de status validados via HTTP

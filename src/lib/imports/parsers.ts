@@ -37,7 +37,12 @@ export interface NormalizedPropertyRow {
   parkingSpots?: number;
   isFeatured?: boolean;
   isFurnished?: boolean;
-  images?: string[]; // URLs — enqueued for the media pipeline post-import
+  /**
+   * Image URLs captured from the payload. Kept as a normalized contract for a
+   * future media-sync step (the import engine does not fetch/store media yet —
+   * see media-service for the gallery pipeline).
+   */
+  images?: string[];
 }
 
 export interface ParsedRowResult {
@@ -145,7 +150,7 @@ function normalizeRaw(input: Record<string, unknown>, index: number): ParsedRowR
     zipCode: stringOr(get(["zipCode", "cep"])),
     latitude: toNumber(get(["latitude", "lat"])),
     longitude: toNumber(get(["longitude", "lng", "lon"])),
-    area: toNumber(get(["area", "areautil", "area_util", "areaUtil"])),
+    area: toNumber(get(["area", "areaM2", "area_m2", "aream2", "areautil", "area_util", "areaUtil"])),
     bedrooms: toInt(get(["bedrooms", "quartos", "dormitorios"])),
     suites: toInt(get(["suites", "suite_completa"])),
     bathrooms: toInt(get(["bathrooms", "banheiros", "vagas_garagem"])),

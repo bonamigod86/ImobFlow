@@ -113,13 +113,30 @@ Códigos comuns: `UNAUTHORIZED` (401), `FORBIDDEN` (403), `VALIDATION_ERROR`
 | --- | --- | --- | --- |
 | GET/POST | `/api/properties` | `properties:read` / `properties:create` | listar/criar |
 | GET/PATCH/DELETE | `/api/properties/{id}` | `properties:*` | ler/atualizar/excluir |
-| POST | `/api/properties/{id}/duplicate` | `properties:create` | duplicar com código novo |
-| POST | `/api/properties/{id}/media` | `properties:update` | enviar mídia (multipart) |
-| PATCH | `/api/properties/{id}/gallery` | `properties:update` | reordenar galeria |
-| PATCH | `/api/properties/{id}/status` | `properties:update` | alterar status |
-| POST | `/api/properties/{id}/view` | pública (autenticada) | registrar visualização |
-| PATCH | `/api/properties/{id}/featured` | `billing:self` | ativar destaque (créditos) |
+| POST | `/api/properties/{id}/duplicate` | `properties:create` | duplicar com código novo (`externalCode` zerado, flags reset) |
+| POST | `/api/properties/{id}/media` | `properties:update` | registrar upload (retorna presigned PUT + `mediaId`/`objectKey`) |
+| PATCH | `/api/properties/{id}/gallery` | `properties:update` | reordenar galeria e/ou definir capa (`orderedIds` + `primaryId`) |
+| PATCH | `/api/properties/{id}/status` | `properties:update` | status (`ACTIVE/INACTIVE/SOLD/RENTED`) e publicar/ocultar (`isActive`) |
+| PATCH | `/api/properties/{id}/featured` | `properties:update` | ativar/remover destaque do imóvel (flag; créditos de destaque comprados são um fluxo de billing separado — §2.8) |
+| POST | `/api/properties/{id}/view` | `properties:read` | registrar visualização (autenticado) |
+| POST | `/api/properties/sync` | `properties:create` | sincronizar catálogo via API/webhook (XML/CSV/JSON → lote assíncrono) — ver §2.6 |
+| PATCH | `/api/media/{mediaId}/primary` | `properties:update` | definir imagem principal da galeria |
+| GET/POST | `/api/media/{mediaId}/bytes` | `properties:read` / `properties:update` | servir/armazenar bytes da mídia (renderização local + fallback upload sem S3) |
 | DELETE | `/api/media/{mediaId}` | `properties:update` | remover mídia |
+
+`POST /api/properties/{id}/media` e `PATCH /api/properties/{id}/gallery`:
+
+```jsonc
+// 1) registrar upload → resposta 202:
+// { "mediaId", "uploadUrl", "objectKey" }
+{ "kind": "IMAGE", "mimeType": "image/jpeg", "sizeBytes": 204800 }
+// uploadUrl presigned p/ cliente fazer PUT direto no object storage. Sem S3
+// configurado (dev local), envie os bytes ao servidor:
+// POST /api/media/{mediaId}/bytes  (body = arquivo cru)
+
+// 2) galeria:
+{ "orderedIds": ["m1", "m2"], "primaryId": "m2" }
+```
 
 ### 2.5 Leads
 
@@ -128,15 +145,56 @@ Códigos comuns: `UNAUTHORIZED` (401), `FORBIDDEN` (403), `VALIDATION_ERROR`
 | GET/POST | `/api/leads` | `leads:read` / `leads:create` | listar/criar (painel) |
 | — | roteamento | `leads:route` | regras de roteamento p/ CRMs (ver §3) |
 
-### 2.6 Importação
+### 2.6 Importação e sincronização de imóveis
 
 | Método | Rota | Ação | Descrição |
 | --- | --- | --- | --- |
 | POST | `/api/imports?format=csv|xml|json&source=...` | `properties:create` | enviar catálogo (corpo cru, máx. 20 MB) |
+| POST | `/api/properties/sync?format=...&source=...` | `properties:create` | **sincronização via API/webhook** — mesmo pipeline, `source` padrão `REST_API` |
 | GET | `/api/imports` | `properties:read` | histórico com status/counters |
-| GET | `/api/imports/{id}` | `properties:read` | detalhe do lote |
+| GET | `/api/imports/{id}` | `properties:read` | detalhe do lote + erros por linha |
+| GET | `/api/jobs/import:{batchId}` | `leads:read` | estado do job de processamento (observabilidade) |
+| POST | `/api/jobs/{jobId}/replay` | `integrations:manage` | reprocessar lote falho a partir da DLQ (`queueName: "property-import-queue"`) |
 
-CSV suportado: colunas `code;title;city;state;neighborhood;target;salePrice;rentPrice;areaM2;bedrooms;bathrooms;parkingSpots;description`.
+**Modelo de processamento (em lote, assíncrono):**
+
+1. O corpo é parseado e validado (síncrono, funções puras): CSV, XML
+   (VivaReal/ZAP) ou JSON (`array` ou `{ "listings": [...] }`).
+2. Um `ImportBatch` é persistido com resumo + erros de parse; a fila
+   `property-import-queue` processa o upsert de cada linha.
+3. **Dedupe**: linha casa por `(tenantId, externalCode)`; sem `externalCode`,
+   por `(tenantId, code)`.
+4. **Sincronização**: imóvel existente é **atualizado no lugar** (preço,
+   situação/status, endereço, áreas, características) mantendo o `slug`
+   público estável; inexistente é criado. Re-enviar o catálogo é idempotente.
+5. **Status**: a coluna `status` (`ACTIVE|INACTIVE|SOLD|RENTED`) é aplicada no
+   upsert — catálogo completo sincronizado a partir do arquivo.
+6. Falha por linha não aborta o lote: `PARTIAL` + erros limitados (200) em
+   `errors`. Falha de infra (fila indisponível) cai para processamento
+   síncrono fail-open; em produção a resiliência é BullMQ (retry com backoff,
+   DLQ + `replay`).
+
+**Colunas reconhecidas (CSV/JSON/XML) — headers são case-insensitive:**
+
+`code`, `externalCode` (aliases: `cod_externo`, `externoId`, `external_id`,
+`idImovel`, `codigoImovel`), `title`/`titulo`/`nome`, `description`/`descricao`,
+`target`/`finalidade`/`operacao`, `category`/`tipo`/`tipoImovel`,
+`status`/`situacao`/`listingStatus`, `salePrice`/`valorVenda`/`preco_venda`,
+`rentPrice`/`valorAluguel`/`preco_aluguel`, `condoFee`/`condominio`,
+`propertyTax`/`iptu`, `address`/`endereco`/`rua`, `number`/`numero`,
+`city`/`cidade`, `state`/`uf`/`estado`, `neighborhood`/`bairro`,
+`zipCode`/`cep`, `latitude`/`lat`, `longitude`/`lng`/`lon`,
+`area`/`areaM2`/`areautil`, `bedrooms`/`quartos`/`dormitorios`,
+`suites`, `bathrooms`/`banheiros`, `parkingSpots`/`vagas`/`garagem`,
+`isFurnished`/`mobiliado`, `isFeatured`/`destaque`, `images`/`fotos`.
+
+Obrigatórios: `city`+`state` e pelo menos `code` **ou** `externalCode`
+(guia a dedupe). Exemplo mínimo CSV:
+
+```csv
+code,title,city,state,target,salePrice,areaM2,bedrooms
+APT-101,Apto Centro,São Paulo,SP,RENT,3900,85,2
+```
 
 ### 2.7 Integrações e webhooks de saída
 

@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
+import type { ImportFileKind, ImportSource } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { QueueManager } from "@/lib/queues/queue-manager";
+import { parseCsv, parseJson, parseXml, type ParseOutput } from "@/lib/imports/parsers";
 import type { NormalizedPropertyRow } from "@/lib/imports/parsers";
 import { withTenantContext } from "@/lib/tenant/context";
 import { buildSearchText, ensureUniqueSlug, slugBaseFrom } from "@/lib/properties/seo";
@@ -173,7 +175,61 @@ export class ImportEngine {
     // needs the id plus tenant context to run.
     const batch = await prisma.importBatch.findUnique({ where: { id: batchId } });
     if (!batch) throw new Error(`ImportBatch ${batchId} not found.`);
-    return QueueManager.addPropertyImport({ tenantId: batch.tenantId, batchId });
+    try {
+      return await QueueManager.addPropertyImport({ tenantId: batch.tenantId, batchId });
+    } catch (err) {
+      // Fail-open: without Redis (local dev / degraded), fall back to running
+      // the batch synchronously so ingestion still works end-to-end. The
+      // resilience policy remains async-first in production.
+      console.warn(`[imports] queue unavailable, running batch synchronously (${(err as Error).message})`);
+      await ImportEngine.runBatch(batchId);
+      return `sync:${batchId}`;
+    }
+  }
+
+  /**
+   * Shared ingestion entrypoint (REST/webhook/portal): parse a raw payload into
+   * normalized rows, persist the ImportBatch and enqueue the async upsert loop.
+   * All ingestion channels converge here so dedupe/status-sync semantics stay
+   * identical regardless of the source format.
+   */
+  static async submit(input: {
+    tenantId: string;
+    raw: string;
+    format: string;
+    source?: ImportSource;
+    fileName?: string | null;
+  }): Promise<{ batchId: string; jobId: string; parsed: ParseOutput }> {
+    const kind = (input.format.toUpperCase() as ImportFileKind) === "JSON" ? "JSON"
+      : (input.format.toUpperCase() as ImportFileKind) === "XML" ? "XML"
+      : "CSV";
+    const parsed =
+      kind === "XML" ? parseXml(input.raw)
+      : kind === "JSON" ? parseJson(input.raw)
+      : parseCsv(input.raw);
+
+    const validRows = parsed.rows.filter((r) => r.ok).map((r) => r.data);
+    const parseErrors = parsed.rows.filter((r) => !r.ok).map((r) => ({ index: r.index, reason: r.errors }));
+    const errorsPayload = { rows: validRows, errors: parseErrors } as unknown as Prisma.InputJsonValue;
+
+    const batch = await prisma.importBatch.create({
+      data: {
+        tenantId: input.tenantId,
+        source: input.source ?? "MANUAL",
+        fileKind: kind,
+        fileName: input.fileName ?? null,
+        status: "QUEUED",
+        totalRows: parsed.total,
+        importedRows: 0,
+        updatedRows: 0,
+        skippedRows: 0,
+        failedRows: parsed.invalid,
+        errors: errorsPayload,
+      } as Prisma.ImportBatchUncheckedCreateInput,
+    });
+
+    const jobId = await ImportEngine.enqueue(batch.id);
+    return { batchId: batch.id, jobId, parsed };
   }
 }
 
