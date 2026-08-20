@@ -102,6 +102,13 @@ no stdout — nenhum e-mail real é enviado.
 - **Acompanhe entregas**: histórico em **Webhook Deliveries** (status, latência,
   tentativas). Para falhas persistentes o registro cai na fila morta — acione o
   administrador da plataforma para reprocessar.
+- **Funil de aquisição (financiamento)**: os CTAs "avaliar opções de
+  financiamento", "conhecer alternativas para aquisição" e "receber uma
+  simulação" geram leads financeiros registrados com o perfil completo quando
+  preenchido — valor do imóvel, entrada, valor a contratar, renda, faixa de
+  parcela, prazo, cidade e imóvel de interesse (sem motor próprio de aprovação:
+  o lead é **qualificado por regras** e **encaminhado ao parceiro autorizado**
+  via webhook `FINANCE_DEFAULT`, que entrega esses campos ao sistema externo).
 
 ### B.4 Assinatura e cobrança (subtensas de destaque)
 

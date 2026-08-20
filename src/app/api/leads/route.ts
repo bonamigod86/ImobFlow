@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { Prisma, type LeadStatus } from "@prisma/client";
+import { Prisma, type LeadStatus, type LeadType } from "@prisma/client";
 import { ACTIONS } from "@/lib/rbac/actions";
 import { withApiRoute } from "@/lib/http/route-wrapper";
 import { leadSchema, queryPageSchema } from "@/lib/validation/schemas";
@@ -25,16 +25,21 @@ const VALID_STATUSES = [
   "LOST",
 ] as const;
 
+const VALID_TYPES = ["BUYER", "SELLER", "RENTER", "INVESTOR", "FINANCIAL"] as const;
+
 export const GET = withApiRoute(ACTIONS.LEADS_READ, async (_ctx, req) => {
   const { page, pageSize } = queryPageSchema.parse(
     Object.fromEntries(new URL(req.url).searchParams),
   );
-  const statusRaw = new URL(req.url).searchParams.get("status") ?? undefined;
+  const qs = Object.fromEntries(new URL(req.url).searchParams);
+  const statusRaw = qs.status ?? undefined;
+  const typeRaw = qs.type ?? undefined;
   const status = VALID_STATUSES.includes(statusRaw as LeadStatus)
     ? (statusRaw as LeadStatus)
     : undefined;
+  const type = VALID_TYPES.includes(typeRaw as LeadType) ? (typeRaw as LeadType) : undefined;
 
-  const where: Prisma.LeadWhereInput = status ? { status } : {};
+  const where: Prisma.LeadWhereInput = { ...(status ? { status } : {}), ...(type ? { type } : {}) };
   const [items, total] = await prisma.$transaction([
     prisma.lead.findMany({
       where,
@@ -51,6 +56,18 @@ export const GET = withApiRoute(ACTIONS.LEADS_READ, async (_ctx, req) => {
         status: true,
         payload: true,
         createdAt: true,
+        financeProfile: {
+          select: {
+            propertyValue: true,
+            downPayment: true,
+            financingAmount: true,
+            monthlyIncome: true,
+            monthlyInstallmentLimit: true,
+            termMonths: true,
+            city: true,
+            state: true,
+          },
+        },
       },
     }),
     prisma.lead.count({ where }),

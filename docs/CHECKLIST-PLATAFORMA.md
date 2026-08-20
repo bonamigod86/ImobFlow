@@ -292,6 +292,61 @@ corrigidas (detalhes na seção "Correções" ao final).
 
 ---
 
+## Item 8 — Leads relacionados à aquisição do imóvel
+
+Status: **100% implementado**. Já na primeira versão a plataforma capta
+interessados em soluções financeiras e **encaminha ao sistema externo
+autorizado** — sem motor próprio de aprovação financeira.
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 8.1 | Captação de interessados em soluções financeiras | OK | 3 CTAs no PDP (financiamento, alternativas, simulação) → `POST /api/public/financial-leads` |
+| 8.2 | Valor do imóvel | OK | `financeProfile.propertyValue` (derivado do anúncio na captura leve) |
+| 8.3 | Valor aproximado de entrada | OK | `downPayment` |
+| 8.4 | Valor pretendido para contratação | OK | `financingAmount` (default `valor − entrada`) |
+| 8.5 | Renda aproximada | OK | `monthlyIncome` |
+| 8.6 | Faixa de parcela | OK | `monthlyInstallmentLimit` |
+| 8.7 | Prazo pretendido | OK | `termMonths` (1–480) |
+| 8.8 | Cidade / UF | OK | `financeProfile.city/state` (derivados do imóvel quando ausentes) |
+| 8.9 | Imóvel de interesse | OK | `lead.propertyId` + snapshot no `payload` |
+| 8.10 | Nome, telefone e e-mail | OK | `lead.name/phone/email` (+ consentimento LGPD 1:1) |
+| 8.11 | Qualificar / encaminhar ao sistema externo autorizado | OK | `RoutingRule` (geo/renda/valor/prazo) → endpoint `FINANCIAL` com webhook `FINANCE_DEFAULT` (todos os campos acima), HMAC, idempotência e DLQ |
+| 8.12 | Registrar | OK | `Lead` + `FinancialLeadProfile` + `LeadConsent` + auditoria `LEAD_CREATED`; listável via `GET /api/leads?type=FINANCIAL` |
+| 8.13 | Sem motor próprio de aprovação | OK | Sem lógica de decisão de crédito; o lead é repassado ao parceiro |
+
+### Testes manuais realizados (via HTTP)
+
+1. `POST /api/public/financial-leads` com **perfil completo** (11 campos) →
+   **201**; `type: FINANCIAL`, `status: NEW`; perfil persistido com
+   `propertyValue/downPayment/financingAmount/monthlyIncome/
+   monthlyInstallmentLimit/termMonths/city/state`.
+2. Captura **leve** (sem perfil) → **201**; valor/cidade/UF derivados do
+   imóvel; roteado ao parceiro `CredFácil Fintech` via `seed-rule-fallback`
+   (entrega `FINANCE_DEFAULT` criada na `WebhookDelivery`).
+3. `GET /api/leads?type=FINANCIAL` → lista somente financeiros com o
+   `financeProfile` embutido.
+4. `GET /api/leads/[id]` → detalhe com perfil financeiro, consentimento e
+   entregas ao parceiro.
+5. Qualificação: `PATCH /api/leads/[id]` `{status: "QUALIFIED"}` →
+   `qualifiedAt` gravado; envio ao parceiro independe do estado do funil.
+6. `DELETE /api/leads/[id]` → remove com cascade (leads de teste limpos).
+
+---
+
+## Correções aplicadas após a auditoria (Item 8)
+
+1. **Listagem não expunha o perfil financeiro** — `GET /api/leads` agora aceita
+   `?type=FINANCIAL` (e demais tipos/status) e retorna `financeProfile` na lista
+   para o painel qualificar sem abrir lead a lead.
+2. **Contrato de campos não estava documentado** — adicionadas a tabela
+   requisito→coluna→payload em `API_AND_WEBHOOK_SPECIFICATION.md` (§2.3) e a
+   descrição do **funil de aquisição** no manual do assinante (`B.3`), com a
+   garantia de ausência de motor próprio de aprovação.
+3. **Checklist sem rastreabilidade** — seção Item 8 criada em
+   `CHECKLIST-PLATAFORMA.md` (requisitos 8.1–8.13, testes manuais).
+
+---
+
 ## Correções aplicadas após a auditoria (Item 5)
 
 1. **Duplicar conflitava no `externalCode`** — `duplicateProperty` copiava o
@@ -398,3 +453,6 @@ corrigidas (detalhes na seção "Correções" ao final).
 - Item 7 (leads): 7 CTAs, snapshot de imóvel/imobiliária/corretor, UTM,
   consentimento LGPD, captura financeira leve e qualificação de funil
   (status/atribuição) validados via HTTP
+- Item 8 (aquisição): captura financeira com os 11 campos, qualificação por
+  regras e encaminhamento ao sistema externo autorizado (`FINANCE_DEFAULT`)
+  validados via HTTP

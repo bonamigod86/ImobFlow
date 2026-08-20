@@ -129,6 +129,27 @@ financeiro é opcional; valor/cidade são derivados do imóvel quando ausentes):
 }
 ```
 
+**Contrato de campos do lead de aquisição** (item 8) — todos opcionais na
+captura, persistidos em `lead.financeProfile` (`FinancialLeadProfile`) e
+repassados ao parceiro pelo envelope `FINANCE_DEFAULT`:
+
+| Campo do requisito | Coluna `FinancialLeadProfile` | Payload `FINANCE_DEFAULT` |
+| --- | --- | --- |
+| valor do imóvel | `propertyValue` | `financial.property_value` |
+| valor aproximado de entrada | `downPayment` | `financial.down_payment` |
+| valor pretendido para contratação | `financingAmount` | `financial.financing_amount` |
+| renda aproximada | `monthlyIncome` | `financial.monthly_income` |
+| faixa de parcela | `monthlyInstallmentLimit` | `financial.monthly_installment_limit` |
+| prazo pretendido | `termMonths` | `financial.term_months` |
+| cidade / UF | `city`, `state` | `location.city/state` |
+| imóvel de interesse | `lead.propertyId` | `lead.property` (id/código) |
+| nome / telefone / e-mail | `lead.name/phone/email` | `contact.name/phone/email` |
+
+O fluxo é **capturar → registrar (Lead + perfil + consentimento) → qualificar
+(regras de roteamento) → encaminhar ao sistema externo autorizado** — sem motor
+próprio de aprovação financeira nesta versão. Não havendo regra correspondente,
+o lead permanece interno (nunca é perdido) e fica visível no painel.
+
 ### 2.4 Imóveis
 
 | Método | Rota | Ação RBAC | Descrição |
@@ -164,7 +185,7 @@ financeiro é opcional; valor/cidade são derivados do imóvel quando ausentes):
 
 | Método | Rota | Ação RBAC | Descrição |
 | --- | --- | --- | --- |
-| GET/POST | `/api/leads` | `leads:read` / `leads:create` | listar/criar (painel) |
+| GET/POST | `/api/leads` | `leads:read` / `leads:create` | listar/criar (painel; `GET` aceita `?type=` e `?status=`, retornando `financeProfile` quando presente) |
 | GET | `/api/leads/{id}` | `leads:read` | detalhe: payload completo, consent, perfil financeiro, entregas |
 | PATCH | `/api/leads/{id}` | `leads:update` | **qualificar**: `status` (`NEW→CONTACTED/QUALIFIED/PROPOSAL_SENT/NEGOTIATION/WON/LOST`), `note`, `assignedToId` (exige `leads:assign`) |
 | DELETE | `/api/leads/{id}` | `leads:delete` | remover lead (cascade consent/entregas) |
