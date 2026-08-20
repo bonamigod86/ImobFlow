@@ -51,9 +51,15 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
 async function getSearchData(filters?: string[], sp: Record<string, string | string[] | undefined> = {}) {
   const parsed = parseFilters(filters);
   const q = single(sp.q);
+  const neighborhood = single(sp.neighborhood);
   const minPrice = Number(single(sp.minPrice) ?? NaN);
   const maxPrice = Number(single(sp.maxPrice) ?? NaN);
   const minBedrooms = Number(single(sp.minBedrooms) ?? NaN);
+  const minSuites = Number(single(sp.minSuites) ?? NaN);
+  const minBathrooms = Number(single(sp.minBathrooms) ?? NaN);
+  const minParking = Number(single(sp.minParking) ?? NaN);
+  const minArea = Number(single(sp.minArea) ?? NaN);
+  const furnished = single(sp.furnished) === "true";
   const page = Math.max(1, Number(single(sp.page) ?? 1) || 1);
   const sort = (single(sp.sort) ?? "relevance") as PublicListingFilters["target"] extends never ? never : "relevance";
 
@@ -62,9 +68,15 @@ async function getSearchData(filters?: string[], sp: Record<string, string | str
     target: parsed.target,
     category: parsed.category,
     q,
+    ...(neighborhood ? { neighborhood } : {}),
     ...(Number.isFinite(minPrice) ? { minPrice } : {}),
     ...(Number.isFinite(maxPrice) ? { maxPrice } : {}),
     ...(Number.isFinite(minBedrooms) ? { minBedrooms } : {}),
+    ...(Number.isFinite(minSuites) ? { minSuites } : {}),
+    ...(Number.isFinite(minBathrooms) ? { minBathrooms } : {}),
+    ...(Number.isFinite(minParking) ? { minParking } : {}),
+    ...(Number.isFinite(minArea) ? { minArea } : {}),
+    ...(furnished ? { furnished: true } : {}),
   };
 
   if (sp.featured === "true") base.featured = true;

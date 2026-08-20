@@ -37,7 +37,8 @@ const property: PublicProperty = {
   updatedAt: "2026-01-02T00:00:00.000Z",
   images: [],
   coverImage: null,
-  broker: { id: "u1", name: "Agente ACME", email: "agent@acme.com" },
+  videos: [],
+  broker: { id: "u1", name: "Agente ACME", email: "agent@acme.com", phone: null },
 };
 
 describe("format", () => {

@@ -8,7 +8,8 @@ import { locationLabel, priceFor } from "@/lib/public/format";
 
 /**
  * Lead capture modal on the PDP (Radix Dialog).
- *  - "WhatsApp" opens the tenant's wa.me chat with a prefilled message.
+ *  - The "WhatsApp" button deep-links to the broker's number (with a
+ *    prefilled message); when no number is set it still opens WhatsApp Web.
  *  - The form posts to the public lead-intake API; origin is always SITE_FORM.
  */
 export function ContactModal({ property }: { property: PublicProperty }) {
@@ -21,10 +22,11 @@ export function ContactModal({ property }: { property: PublicProperty }) {
   const waMessage = encodeURIComponent(
     `Olá! Tenho interesse no imóvel "${property.title}" (${property.code} — ${property.city}/${property.state}), anunciado por ${property.tenantName}.`,
   );
-  // WhatsApp deep-link with a prefilled message. No hardcoded tenant number —
-  // real deployments attach the broker's WhatsApp to the tenant profile; when
-  // absent the form (below) still captures the lead for the agent.
-  const waHref = `https://wa.me/?text=${waMessage}`;
+  // Deep-link to the broker's registered WhatsApp; digits-only per wa.me spec.
+  const waDigits = (property.broker?.phone ?? "").replace(/\D/g, "");
+  const waHref = waDigits
+    ? `https://wa.me/${waDigits}?text=${waMessage}`
+    : `https://wa.me/?text=${waMessage}`;
 
   async function submit(form: FormData) {
     setSending(true);

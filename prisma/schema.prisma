@@ -490,6 +490,8 @@ model User {
   tenant       Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name         String
   email        String    @unique // one identity across the platform (login keys)
+  /// Contact phone (broker WhatsApp on the public portal listings).
+  phone        String?
   passwordHash String // argon2/bcrypt hash — never a plaintext
   role         UserRole  @default(AGENT)
   isActive     Boolean   @default(true)

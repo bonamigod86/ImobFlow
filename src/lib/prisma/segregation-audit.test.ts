@@ -34,6 +34,7 @@ const PUBLIC_ROUTES = new Set([
   "auth/reset-password",
   "billing/webhooks",
   "public/leads",
+  "public/listings",
   "public/financial-leads",
 ]);
 

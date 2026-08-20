@@ -37,6 +37,8 @@ export interface PublicProperty {
   images: PublicMedia[];
   /** Primary listing image, if any. */
   coverImage: PublicMedia | null;
+  /** Video walkthroughs/tours attached to the listing. */
+  videos: PublicMedia[];
   /** Attributed broker (an active AGENT/OWNER of the listing's tenant). */
   broker: PublicBroker | null;
 }
@@ -56,6 +58,8 @@ export interface PublicBroker {
   id: string;
   name: string;
   email: string;
+  /** Contact phone (WhatsApp deep-link on the PDP); null when unset. */
+  phone: string | null;
 }
 
 /** Normalized, URL-safe city slug used in routes: `/imoveis/sao-paulo/venda/...`. */

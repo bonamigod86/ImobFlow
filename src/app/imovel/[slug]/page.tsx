@@ -13,6 +13,8 @@ import {
   CalendarClock,
   Star,
   MessageCircle,
+  Mail,
+  Phone,
 } from "lucide-react";
 import { getPublicListing, listSimilar } from "@/lib/public/repository";
 import { listingMetadata, listingJsonLd } from "@/lib/public/seo";
@@ -21,8 +23,11 @@ import { formatArea, locationLabel, priceFor } from "@/lib/public/format";
 import { SiteHeader } from "@/components/portal/SiteHeader";
 import { SiteFooter } from "@/components/portal/SiteFooter";
 import { Gallery } from "@/components/portal/Gallery";
+import { VideoGallery } from "@/components/portal/VideoGallery";
 import { PropertyCard } from "@/components/portal/PropertyCard";
 import { ContactModal } from "@/components/portal/ContactModal";
+import { ShareButtons } from "@/components/portal/ShareButtons";
+import { FavoriteButton } from "@/components/portal/FavoriteButton";
 import type { PublicProperty } from "@/lib/public/types";
 
 export const revalidate = 300;
@@ -89,6 +94,20 @@ export default async function PDP({ params }: PDPProps) {
           {/* Gallery + main content */}
           <div className="lg:col-span-2">
             <Gallery images={property.images} title={property.title} />
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 pl-1 pr-3 text-sm font-medium text-slate-600">
+                <FavoriteButton propertyId={property.id} />
+                Favorito
+              </div>
+              <ShareButtons url={`/imovel/${encodeURIComponent(property.slug ?? "")}`} title={property.title} />
+            </div>
+
+            {property.videos.length > 0 && (
+              <div className="mt-6">
+                <VideoGallery videos={property.videos} poster={property.coverImage?.url} />
+              </div>
+            )}
 
             <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -167,6 +186,27 @@ export default async function PDP({ params }: PDPProps) {
                   </div>
                 </div>
               )}
+
+              <div className="mt-4 space-y-2 text-sm">
+                {property.broker?.email && (
+                  <a
+                    href={`mailto:${property.broker.email}`}
+                    className="flex items-center gap-2 text-slate-600 transition-colors hover:text-brand-600"
+                  >
+                    <Mail className="h-4 w-4 shrink-0 text-slate-400" />
+                    <span className="truncate">{property.broker.email}</span>
+                  </a>
+                )}
+                {property.broker?.phone && (
+                  <a
+                    href={`tel:${property.broker.phone}`}
+                    className="flex items-center gap-2 text-slate-600 transition-colors hover:text-brand-600"
+                  >
+                    <Phone className="h-4 w-4 shrink-0 text-slate-400" />
+                    {property.broker.phone}
+                  </a>
+                )}
+              </div>
 
               <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
                 <p className="flex items-center gap-2">

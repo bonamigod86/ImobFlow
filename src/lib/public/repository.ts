@@ -1,4 +1,4 @@
-﻿import { Prisma, type MediaKind, type MediaStatus } from "@prisma/client";
+﻿import { Prisma, type MediaStatus } from "@prisma/client";
 import { prismaUnscoped } from "@/lib/prisma/client";
 import type {
   PublicBroker,
@@ -32,7 +32,7 @@ const VISIBLE: Prisma.PropertyWhereInput = {
 };
 
 const MEDIA_SELECT = {
-  where: { kind: "IMAGE" as MediaKind, status: "READY" as MediaStatus },
+  where: { status: "READY" as MediaStatus },
   orderBy: [{ isPrimary: "desc" as const }, { sortOrder: "asc" as const }],
 };
 
@@ -193,6 +193,16 @@ export async function getPublicListing(slug: string): Promise<PublicProperty | n
   return resolved[0] ?? null;
 }
 
+/** Batch fetch of visible listings by id (favorites/results pages). */
+export async function getPublicListingsByIds(ids: string[]): Promise<PublicProperty[]> {
+  if (ids.length === 0) return [];
+  const rows = await prismaUnscoped.property.findMany({
+    where: { ...VISIBLE, id: { in: ids } },
+    include: LISTING_INCLUDE(),
+  });
+  return resolveToPublic(rows);
+}
+
 /** Featured listings for the landing page. */
 export async function listFeatured(listingCount = 6): Promise<PublicProperty[]> {
   const rows = await prismaUnscoped.property.findMany({
@@ -238,9 +248,9 @@ async function brokerFor(tenantId: string): Promise<PublicBroker | null> {
   const user = await prismaUnscoped.user.findFirst({
     where: { tenantId, isActive: true, role: { in: ["OWNER", "MANAGER", "AGENT"] } },
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, email: true, phone: true },
   });
-  return user ? { id: user.id, name: user.name, email: user.email } : null;
+  return user ? { id: user.id, name: user.name, email: user.email, phone: user.phone } : null;
 }
 
 function decimalString(v: Prisma.Decimal | null | undefined): string | null {
@@ -263,7 +273,9 @@ async function resolveToPublic(rows: ListingRow[]): Promise<PublicProperty[]> {
         })),
       );
       publicMedia.sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.sortOrder - b.sortOrder);
-      const coverImage = publicMedia.find((m) => m.isPrimary) ?? publicMedia[0] ?? null;
+      const images = publicMedia.filter((m) => m.kind === "IMAGE");
+      const videos = publicMedia.filter((m) => m.kind === "VIDEO");
+      const coverImage = images.find((m) => m.isPrimary) ?? images[0] ?? null;
       return {
         id: r.id,
         slug: r.slug,
@@ -296,8 +308,9 @@ async function resolveToPublic(rows: ListingRow[]): Promise<PublicProperty[]> {
         isFurnished: r.isFurnished,
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
-        images: publicMedia,
+        images: images,
         coverImage,
+        videos,
         broker: await brokerFor(r.tenantId),
       };
     }),

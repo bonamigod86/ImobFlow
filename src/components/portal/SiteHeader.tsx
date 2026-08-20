@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, Search } from "lucide-react";
+import { Building2, Heart, Search } from "lucide-react";
 import { SITE_NAME } from "@/lib/public/seo";
 
 export function SiteHeader() {
@@ -26,6 +26,14 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/favoritos"
+            className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200"
+            aria-label="Meus favoritos"
+          >
+            <Heart className="h-4 w-4" />
+            <span className="hidden sm:inline">Favoritos</span>
+          </Link>
           <Link
             href="/imoveis"
             className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200"

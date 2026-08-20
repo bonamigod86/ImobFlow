@@ -12,6 +12,14 @@ const PRICE_BANDS = [
   { label: "Acima de R$ 2 mi", min: 2000000, max: undefined },
 ];
 
+const AREA_BANDS = [
+  { label: "50 m²+", min: 50 },
+  { label: "80 m²+", min: 80 },
+  { label: "100 m²+", min: 100 },
+  { label: "150 m²+", min: 150 },
+  { label: "200 m²+", min: 200 },
+];
+
 const SORTS = [
   { value: "relevance", label: "Mais relevantes" },
   { value: "newest", label: "Mais recentes" },
@@ -56,6 +64,12 @@ export function SearchFilters({
     priceBand?: string;
     minBedrooms?: string;
     sort?: string;
+    neighborhood?: string;
+    minSuites?: string;
+    minBathrooms?: string;
+    minParking?: string;
+    minArea?: string;
+    furnished?: string;
   };
 }) {
   const router = useRouter();
@@ -92,8 +106,8 @@ export function SearchFilters({
         <span className="text-sm font-semibold text-slate-800">Filtros</span>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <div className="col-span-2 md:col-span-3 lg:col-span-2">
+      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+        <div className="col-span-2 md:col-span-2 lg:col-span-2">
           <label className="mb-1 block text-xs font-medium text-slate-500">Buscar por texto</label>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -107,6 +121,19 @@ export function SearchFilters({
               }}
             />
           </div>
+        </div>
+
+        <div className="col-span-2 md:col-span-2 lg:col-span-2">
+          <label className="mb-1 block text-xs font-medium text-slate-500">Bairro</label>
+          <input
+            type="search"
+            defaultValue={initial.neighborhood ?? searchParams.get("neighborhood") ?? ""}
+            placeholder="Ex.: Jardins, Moema…"
+            className="w-full rounded-lg border border-slate-200 py-2 pl-3 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") apply({ neighborhood: (e.target as HTMLInputElement).value });
+            }}
+          />
         </div>
 
         <ReadonlySelect
@@ -161,6 +188,59 @@ export function SearchFilters({
           <option value="3">3+</option>
           <option value="4">4+</option>
         </ReadonlySelect>
+
+        <ReadonlySelect
+          value={searchParams.get("minSuites") ?? initial.minSuites ?? ""}
+          onChange={(v) => apply({ minSuites: v })}
+        >
+          <option value="">Suítes</option>
+          <option value="1">1+</option>
+          <option value="2">2+</option>
+          <option value="3">3+</option>
+        </ReadonlySelect>
+
+        <ReadonlySelect
+          value={searchParams.get("minBathrooms") ?? initial.minBathrooms ?? ""}
+          onChange={(v) => apply({ minBathrooms: v })}
+        >
+          <option value="">Banheiros</option>
+          <option value="1">1+</option>
+          <option value="2">2+</option>
+          <option value="3">3+</option>
+          <option value="4">4+</option>
+        </ReadonlySelect>
+
+        <ReadonlySelect
+          value={searchParams.get("minParking") ?? initial.minParking ?? ""}
+          onChange={(v) => apply({ minParking: v })}
+        >
+          <option value="">Vagas</option>
+          <option value="1">1+</option>
+          <option value="2">2+</option>
+          <option value="3">3+</option>
+        </ReadonlySelect>
+
+        <ReadonlySelect
+          value={searchParams.get("minArea") ?? initial.minArea ?? ""}
+          onChange={(v) => apply({ minArea: v })}
+        >
+          <option value="">Área mínima</option>
+          {AREA_BANDS.map((b) => (
+            <option key={b.min} value={b.min}>
+              {b.label}
+            </option>
+          ))}
+        </ReadonlySelect>
+
+        <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            defaultChecked={searchParams.get("furnished") === "true"}
+            onChange={(e) => apply({ furnished: e.target.checked ? "true" : null })}
+            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-100"
+          />
+          Mobiliado
+        </label>
 
         <ReadonlySelect
           value={searchParams.get("sort") ?? initial.sort ?? "relevance"}

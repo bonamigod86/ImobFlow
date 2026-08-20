@@ -230,18 +230,18 @@ async function seedTenant(
     create: { slug, name, planId: plan.id, status },
   });
 
-  const users: Array<[string, string, "OWNER" | "MANAGER" | "AGENT" | "RECEPTIONIST"]> = [
-    [`${slug}@${slug}.com`, `${slug} Owner`, "OWNER"],
-    [`manager@${slug}.com`, `${slug} Manager`, "MANAGER"],
-    [`agent@${slug}.com`, `${slug} Agent`, "AGENT"],
-    [`reception@${slug}.com`, `${slug} Receptionist`, "RECEPTIONIST"],
+  const users: Array<[string, string, "OWNER" | "MANAGER" | "AGENT" | "RECEPTIONIST", string | null]> = [
+    [`${slug}@${slug}.com`, `${slug} Owner`, "OWNER", "+55 11 90000-0000"],
+    [`manager@${slug}.com`, `${slug} Manager`, "MANAGER", null],
+    [`agent@${slug}.com`, `${slug} Agent`, "AGENT", null],
+    [`reception@${slug}.com`, `${slug} Receptionist`, "RECEPTIONIST", null],
   ];
 
-  for (const [email, display, role] of users) {
+  for (const [email, display, role, phone] of users) {
     await prisma.user.upsert({
       where: { email },
-      update: { name: display, role },
-      create: { tenantId: tenant.id, email, name: display, passwordHash, role },
+      update: { name: display, role, phone },
+      create: { tenantId: tenant.id, email, name: display, passwordHash, role, phone },
     });
   }
 
