@@ -36,6 +36,7 @@ const PUBLIC_ROUTES = new Set([
   "public/leads",
   "public/listings",
   "public/financial-leads",
+  "public/views",
   "register",
 ]);
 

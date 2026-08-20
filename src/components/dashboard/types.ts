@@ -57,6 +57,7 @@ export interface TopPropertyView {
   title: string;
   views7d: number;
   leads7d: number;
+  leads30d: number;
   conversionRate: number;
   slug?: string | null;
   coverImage: string | null;

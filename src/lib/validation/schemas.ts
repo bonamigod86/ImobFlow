@@ -128,21 +128,30 @@ export const consentSchema = z.object({
 export type ConsentInput = z.infer<typeof consentSchema>;
 
 /** Public intake for a real-estate lead (portal PDP / landing quick forms). */
-export const publicRealEstateLeadSchema = z.object({
-  propertyId: z.string().trim().min(1).max(64),
-  name: z.string().trim().min(1, "Informe seu nome.").max(255),
-  email: z.string().trim().email("E-mail inválido.").max(255).optional().or(z.literal("")),
-  phone: z.string().trim().min(8, "Informe um telefone com DDD.").max(30).optional().or(z.literal("")),
-  message: z.string().trim().max(2000).optional(),
-  schedule: z
-    .object({
-      date: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.").optional(),
-      time: z.string().trim().regex(/^\d{2}:\d{2}$/, "Horário inválido.").optional(),
-    })
-    .optional(),
-  utm: utmSchema.optional().default({}),
-  consent: consentSchema,
-});
+export const publicRealEstateLeadSchema = z
+  .object({
+    propertyId: z.string().trim().min(1).max(64),
+    name: z.string().trim().min(1, "Informe seu nome.").max(255).optional(),
+    email: z.string().trim().email("E-mail inválido.").max(255).optional().or(z.literal("")),
+    phone: z.string().trim().min(8, "Informe um telefone com DDD.").max(30).optional().or(z.literal("")),
+    message: z.string().trim().max(2000).optional(),
+    /** "form" — filled intake; "whatsapp" — visitor clicked the WhatsApp CTA. */
+    channel: z.enum(["form", "whatsapp"]).optional().default("form"),
+    schedule: z
+      .object({
+        date: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.").optional(),
+        time: z.string().trim().regex(/^\d{2}:\d{2}$/, "Horário inválido.").optional(),
+      })
+      .optional(),
+    utm: utmSchema.optional().default({}),
+    consent: consentSchema,
+  })
+  .superRefine((v, ctx) => {
+    // WhatsApp click tracking is anonymous — name is not required there.
+    if (v.channel !== "whatsapp" && !v.name) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe seu nome.", path: ["name"] });
+    }
+  });
 
 export type PublicRealEstateLeadInput = z.infer<typeof publicRealEstateLeadSchema>;
 

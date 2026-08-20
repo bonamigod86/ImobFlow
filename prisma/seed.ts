@@ -165,6 +165,11 @@ const acme = await seedTenant(
 const norton = await seedTenant("norton", "Norton Brokers", free, "TRIAL", passwordHash, { type: "BROKER" });
 const delta = await seedTenant("delta", "Delta Intermediações", enterprise, "PAST_DUE", passwordHash, { type: "AGENCY" });
 
+  // --- Item 4: demo dashboard metrics (visitas, solicitações, WhatsApp) ------
+  // Populates the primary demo tenant so the subscriber dashboard KPIs have
+  // live numbers (views, visits, WhatsApp contacts). Idempotent.
+  await seedDashboardMetrics(acme.id, acme.slug);
+
   // --- Phase 4: lead engine destinations + routing (platform-owned) ---------
   const cred = await prisma.webhookEndpoint.upsert({
     where: { id: "seed-end-cred" },
@@ -550,6 +555,115 @@ async function seedTenant(
   );
 
   return { id: tenant.id, slug: tenant.slug, name: tenant.name };
+}
+
+/**
+ * Item 4 — demo dashboard metrics for a tenant: PropertyView rows (portal
+ * visits over the last 30 days), visit-request leads (payload.schedule) and
+ * WhatsApp-click leads (payload.channel = "whatsapp"). All writes are guarded
+ * so re-running the seed never duplicates data.
+ */
+async function seedDashboardMetrics(tenantId: string, slug: string) {
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const properties = await prisma.property.findMany({
+    where: { tenantId, isActive: true },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (properties.length === 0) return;
+
+  // Views — varying cadence per listing over the last 30d.
+  let propViews = 0;
+  for (let i = 0; i < properties.length; i += 1) {
+    const p = properties[i];
+    const totalViews = 4 + (i * 7) % 12;
+    for (let k = 0; k < totalViews; k += 1) {
+      const viewer = `seed:view:${p?.id}:${k}`;
+      const exists = await prisma.propertyView.findFirst({ where: { viewer } });
+      if (exists) continue;
+      const offsetDays = (i * 2 + k * 4) % 30;
+      await prisma.propertyView.create({
+        data: {
+          tenantId,
+          propertyId: p?.id as string,
+          viewer,
+          channel: "portal",
+          pageUrl: `/imovel/seed-${i + 1}`,
+          userAgent: "seed/db",
+          ipAddress: "127.0.0.1",
+          createdAt: new Date(now - offsetDays * DAY - (k % 12) * 3600_000),
+        },
+      });
+      propViews += 1;
+    }
+  }
+
+  // Solicitações de visita (leads com horário agendado).
+  const visitLeads: Array<{ name: string; email: string; date: string; time: string }> = [
+    { name: "João Pereira", email: `visita.demo.1@${slug}.com`, date: "2026-08-28", time: "10:30" },
+    { name: "Camila Nunes", email: `visita.demo.2@${slug}.com`, date: "2026-09-01", time: "14:00" },
+    { name: "Rodrigo Alves", email: `visita.demo.3@${slug}.com`, date: "2026-08-25", time: "09:15" },
+  ];
+  let visitLeadsCount = 0;
+  for (const [i, lead] of visitLeads.entries()) {
+    let existing = await prisma.lead.findFirst({ where: { tenantId, email: lead.email } });
+    if (!existing) {
+      existing = await prisma.lead.create({
+        data: {
+          tenantId,
+          propertyId: properties[i % properties.length]!.id,
+          name: lead.name,
+          email: lead.email,
+          phone: "+55 11 95555-00" + i,
+          type: "RENTER",
+          origin: "SITE_FORM",
+          status: "NEW",
+          payload: {
+            source: "portal",
+            channel: "form",
+            message: "Tenho interesse e gostaria de agendar uma visita.",
+            schedule: { date: lead.date, time: lead.time },
+          },
+          consent: { create: consentRecord(tenantId) },
+          createdAt: new Date(now - (12 - i * 4) * DAY),
+        },
+      });
+      visitLeadsCount += 1;
+    }
+  }
+
+  // Contatos por WhatsApp (cliques no CTA wa.me).
+  const waLeads: Array<{ name: string; email: string }> = [
+    { name: "Fernanda Lima", email: `whatsapp.demo.1@${slug}.com` },
+    { name: "Bruno Castro", email: `whatsapp.demo.2@${slug}.com` },
+  ];
+  let waLeadsCount = 0;
+  for (const [i, lead] of waLeads.entries()) {
+    let existing = await prisma.lead.findFirst({ where: { tenantId, email: lead.email } });
+    if (!existing) {
+      existing = await prisma.lead.create({
+        data: {
+          tenantId,
+          propertyId: properties[(i + 1) % properties.length]!.id,
+          name: lead.name,
+          email: lead.email,
+          phone: "+55 11 96666-00" + i,
+          type: "BUYER",
+          origin: "SITE_FORM",
+          status: "NEW",
+          payload: { source: "portal", channel: "whatsapp" },
+          consent: { create: consentRecord(tenantId) },
+          createdAt: new Date(now - (20 - i * 9) * DAY),
+        },
+      });
+      waLeadsCount += 1;
+    }
+  }
+
+  console.log(
+    `Tenant "${slug}" metrics seeded (${propViews} views, ${visitLeadsCount} visitas, ${waLeadsCount} whatsapp).`,
+  );
 }
 
 /** LGPD consent record used by seeded captures (report-grade demo). */

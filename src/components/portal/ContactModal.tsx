@@ -41,6 +41,8 @@ export function ContactModal({ property }: { property: PublicProperty }) {
           email: form.get("email"),
           phone: form.get("phone"),
           message: form.get("message"),
+          channel: "form",
+          consent: { granted: true, textVersion: "2026-08-19.v1" },
         }),
       });
       if (!res.ok) {
@@ -55,6 +57,23 @@ export function ContactModal({ property }: { property: PublicProperty }) {
     }
   }
 
+  /** Records the WhatsApp outreach in the broker's funnel (anonymous, LGPD-safe). */
+  async function trackWhatsApp() {
+    try {
+      await fetch("/api/public/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          propertyId: property.id,
+          channel: "whatsapp",
+          consent: { granted: true, textVersion: "2026-08-19.v1" },
+        }),
+      });
+    } catch {
+      // Non-blocking — the deep-link still opens.
+    }
+  }
+
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -63,6 +82,7 @@ export function ContactModal({ property }: { property: PublicProperty }) {
             href={waHref}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => void trackWhatsApp()}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-semibold text-white transition-colors hover:brightness-95"
           >
             <MessageCircle className="h-4 w-4" />

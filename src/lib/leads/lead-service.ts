@@ -43,11 +43,13 @@ export interface ClientMeta {
 
 export interface RealEstateLeadInput {
   propertyId: string;
-  name: string;
+  name?: string;
   email?: string | null;
   phone?: string | null;
   message?: string | null;
   schedule?: { date?: string; time?: string } | null;
+  /** "form" — filled intake form; "whatsapp" — visitor opened the wa.me CTA. */
+  channel?: "form" | "whatsapp";
   utm: Record<string, string>;
   consentTextVersion: string;
   client: ClientMeta;
@@ -255,6 +257,10 @@ async function persistConsent(data: {
 export async function captureRealEstateLead(input: RealEstateLeadInput): Promise<LeadCaptureResult> {
   const property = await resolveVisibleProperty(input.propertyId);
 
+  const channel = input.channel ?? "form";
+  const name =
+    input.name?.trim() || (channel === "whatsapp" ? "Interessado via WhatsApp" : "");
+
   const type: Prisma.LeadCreateInput["type"] =
     input.message?.toLowerCase().includes("alugar") ? "RENTER" : "BUYER";
   const utm = Object.keys(input.utm).length > 0 ? { utm: input.utm } : {};
@@ -264,7 +270,7 @@ export async function captureRealEstateLead(input: RealEstateLeadInput): Promise
     data: {
       tenantId: property.tenantId,
       propertyId: property.id,
-      name: input.name,
+      name,
       email: input.email || null,
       phone: input.phone || null,
       type,
@@ -274,6 +280,7 @@ export async function captureRealEstateLead(input: RealEstateLeadInput): Promise
         property: { id: property.id, code: property.code, title: property.title },
         message: input.message ?? null,
         source: "portal",
+        channel,
         ...utm,
         ...schedule,
       },

@@ -28,6 +28,7 @@ import { PropertyCard } from "@/components/portal/PropertyCard";
 import { ContactModal } from "@/components/portal/ContactModal";
 import { ShareButtons } from "@/components/portal/ShareButtons";
 import { FavoriteButton } from "@/components/portal/FavoriteButton";
+import { ViewTracker } from "@/components/portal/ViewTracker";
 import type { PublicProperty } from "@/lib/public/types";
 
 export const revalidate = 300;
@@ -76,6 +77,7 @@ export default async function PDP({ params }: PDPProps) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <SiteHeader />
+      <ViewTracker propertyId={property.id} />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <script
           type="application/ld+json"

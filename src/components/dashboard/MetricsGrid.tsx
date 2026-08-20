@@ -1,16 +1,32 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Building2, Eye, Users, MousePointerClick, ArrowUpRight, ArrowDownRight, Minus, Sparkles } from "lucide-react";
+import {
+  Building2,
+  Eye,
+  Users,
+  MousePointerClick,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+  Sparkles,
+  CalendarClock,
+  MessageCircle,
+  BadgeCheck,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatBRL } from "@/lib/public/format";
 import type { DashboardSnapshot, PropertyStatus, StatusCounts } from "@/components/dashboard/types";
 import {
   STATUS_LABELS,
   STATUS_BADGE_VARIANTS,
+  TENANT_STATUS_LABELS,
+  TENANT_STATUS_VARIANTS,
   formatCount,
+  formatDate,
   usagePercent,
   usageTone,
   deltaPct,
@@ -36,9 +52,11 @@ export function MetricsGrid({ snapshot, counts }: MetricsGridProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <ActivePropertiesCard counts={counts} />
-      <PlanQuotaCard utilization={snapshot.utilization} />
+      <PlanQuotaCard snapshot={snapshot} />
       <LeadPipelineCard snapshot={snapshot} />
       <ViewsCard snapshot={snapshot} />
+      <VisitsCard snapshot={snapshot} />
+      <WhatsAppCard snapshot={snapshot} />
     </div>
   );
 }
@@ -68,7 +86,8 @@ function ActivePropertiesCard({ counts }: { counts: StatusCounts }) {
   );
 }
 
-function PlanQuotaCard({ utilization }: { utilization: DashboardSnapshot["utilization"] }) {
+function PlanQuotaCard({ snapshot }: { snapshot: DashboardSnapshot }) {
+  const { utilization } = snapshot;
   if (!utilization) {
     return (
       <Card>
@@ -81,6 +100,7 @@ function PlanQuotaCard({ utilization }: { utilization: DashboardSnapshot["utiliz
       </Card>
     );
   }
+  const subscription = snapshot.subscription;
   const rows: Array<{
     label: string;
     used: number;
@@ -90,43 +110,82 @@ function PlanQuotaCard({ utilization }: { utilization: DashboardSnapshot["utiliz
     { label: "Imóveis", used: utilization.usedProperties, max: utilization.maxProperties, icon: <Building2 className="h-4 w-4 text-brand-400" /> },
     { label: "Usuários", used: utilization.usedUsers, max: utilization.maxUsers, icon: <Users className="h-4 w-4 text-sky-400" /> },
     { label: "Leads/mês", used: utilization.usedLeads, max: utilization.maxLeads, icon: <MousePointerClick className="h-4 w-4 text-emerald-400" /> },
+    { label: "Destaques", used: utilization.usedHighlights, max: utilization.maxHighlights, icon: <Sparkles className="h-4 w-4 text-amber-400" /> },
   ];
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <GaugeDot />
-          Utilização do plano
+          Plano e utilização
         </CardTitle>
         <CardDescription className="flex items-center gap-2">
           {utilization.planName}
           <Badge variant="secondary" className="font-mono uppercase">{utilization.planCode}</Badge>
+          {subscription && (
+            <Badge variant={TENANT_STATUS_VARIANTS[subscription.status]}>
+              {TENANT_STATUS_LABELS[subscription.status]}
+            </Badge>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {rows.map((row) => {
-          const pct = usagePercent(row.used, row.max);
-          const maxLabel = row.max === null ? "Ilimitado" : formatCount(row.max);
-          return (
-            <div key={row.label} className="space-y-1.5">
-              <div className="flex items-center justify-between gap-3">
-                <span className="flex items-center gap-2 text-sm text-ink-200">
-                  {row.icon}
-                  {row.label}
-                </span>
-                <span className="text-xs tabular-nums text-ink-300">
-                  {formatCount(row.used)} de {maxLabel}
-                  {pct !== null && <span className="ml-1 text-ink-400">({pct}%)</span>}
-                </span>
+        <div className="space-y-3">
+          {rows.map((row) => {
+            const pct = usagePercent(row.used, row.max);
+            const maxLabel = row.max === null ? "Ilimitado" : formatCount(row.max);
+            return (
+              <div key={row.label} className="space-y-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2 text-sm text-ink-200">
+                    {row.icon}
+                    {row.label}
+                  </span>
+                  <span className="text-xs tabular-nums text-ink-300">
+                    {formatCount(row.used)} de {maxLabel}
+                    {pct !== null && <span className="ml-1 text-ink-400">({pct}%)</span>}
+                  </span>
+                </div>
+                {pct === null ? (
+                  <div className="h-2 rounded-full bg-ink-700" />
+                ) : (
+                  <Progress value={pct} indicatorClassName={usageTone(pct)} />
+                )}
               </div>
-              {pct === null ? (
-                <div className="h-2 rounded-full bg-ink-700" />
-              ) : (
-                <Progress value={pct} indicatorClassName={usageTone(pct)} />
-              )}
+            );
+          })}
+        </div>
+
+        {subscription && (
+          <div className="space-y-2 rounded-lg border border-ink-700 bg-ink-950/40 px-3 py-2.5 text-xs text-ink-300">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-ink-400">
+                <BadgeCheck className="h-3.5 w-3.5" />
+                Assinatura
+              </span>
+              <span className="font-medium text-ink-100">
+                {formatBRL(String(subscription.priceCents / 100), { compact: true })}
+                <span className="text-ink-400">/{subscription.billingCycle === "YEARLY" ? "ano" : "mês"}</span>
+              </span>
             </div>
-          );
-        })}
+            <div className="flex items-center justify-between">
+              <span className="text-ink-400">Próximo vencimento</span>
+              <span className="tabular-nums text-ink-100">{formatDate(subscription.nextInvoiceDueAt || subscription.currentPeriodEnd)}</span>
+            </div>
+            {subscription.status === "TRIAL" && subscription.trialEndsAt && (
+              <div className="flex items-center justify-between">
+                <span className="text-ink-400">Fim da avaliação</span>
+                <span className="tabular-nums text-ink-100">{formatDate(subscription.trialEndsAt)}</span>
+              </div>
+            )}
+            {utilization.maxHighlights != null && (
+              <div className="flex items-center justify-between">
+                <span className="text-ink-400">Créditos de destaque</span>
+                <span className="tabular-nums text-ink-100">{formatCount(utilization.highlightBalance)} disponíveis</span>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -205,6 +264,64 @@ function ViewsCard({ snapshot }: { snapshot: DashboardSnapshot }) {
           </div>
           <Bars7vs30 current7d={snapshot.views7d} total30d={snapshot.views30d} />
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function VisitsCard({ snapshot }: { snapshot: DashboardSnapshot }) {
+  const trend = deltaPct(snapshot.visits7d, snapshot.visits30d);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CalendarClock className="h-4 w-4 text-violet-400" />
+          Visitas solicitadas
+        </CardTitle>
+        <CardDescription>Interessados que agendaram visita</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-baseline gap-2">
+          <p className="text-3xl font-semibold tabular-nums tracking-tight text-ink-50">
+            {formatCount(snapshot.visits30d)}
+          </p>
+          <DeltaBadge delta={trend.delta} pct={trend.pct} />
+        </div>
+        <p className="mt-1 text-sm text-ink-300">
+          <span className="text-ink-100">{formatCount(snapshot.visits7d)}</span> nos últimos 7 dias
+        </p>
+        <p className="mt-4 rounded-lg border border-ink-700 bg-ink-950/40 px-3 py-2 text-xs text-ink-400">
+          Leads com data/horário agendado (solicitações de visita).
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function WhatsAppCard({ snapshot }: { snapshot: DashboardSnapshot }) {
+  const trend = deltaPct(snapshot.whatsapp7d, snapshot.whatsapp30d);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MessageCircle className="h-4 w-4 text-[#25D366]" />
+          Contatos por WhatsApp
+        </CardTitle>
+        <CardDescription>Cliques no botão de conversa</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-baseline gap-2">
+          <p className="text-3xl font-semibold tabular-nums tracking-tight text-ink-50">
+            {formatCount(snapshot.whatsapp30d)}
+          </p>
+          <DeltaBadge delta={trend.delta} pct={trend.pct} />
+        </div>
+        <p className="mt-1 text-sm text-ink-300">
+          <span className="text-ink-100">{formatCount(snapshot.whatsapp7d)}</span> nos últimos 7 dias
+        </p>
+        <p className="mt-4 rounded-lg border border-ink-700 bg-ink-950/40 px-3 py-2 text-xs text-ink-400">
+          Visitantes que iniciaram conversa para este imóvel.
+        </p>
       </CardContent>
     </Card>
   );

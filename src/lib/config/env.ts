@@ -113,6 +113,8 @@ const envSchema = z.object({
   RATE_LIMIT_AUTH: z.coerce.number().int().min(1).max(10000).default(10),
   /** Max public lead captures per IP per window (portal spikes). */
   RATE_LIMIT_PUBLIC_LEADS: z.coerce.number().int().min(1).max(100000).default(30),
+  /** Max public page-impressions per IP per window (portal browsing). */
+  RATE_LIMIT_PUBLIC_VIEWS: z.coerce.number().int().min(1).max(1000000).default(120),
   /** Comma-separated allowed origins for the /api/public/* CORS header. */
   CORS_ORIGINS: z.string().optional().default(""),
 });

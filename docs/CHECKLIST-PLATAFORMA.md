@@ -85,6 +85,66 @@ corrigidas e o fluxo foi testado de ponta a ponta via HTTP.
 
 ---
 
+## Item 4 — Painel do assinante
+
+Status: **100% implementado**. Divergências identificadas na auditoria foram
+corrigidas e o fluxo foi testado via HTTP (KPIs com dados reais de demo).
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 4.1 | Imóveis ativos, inativos, vendidos, alugados | OK | Cartão "Imóveis ativos" + badges por status (`statusBreakdown` no snapshot) |
+| 4.2 | Visualizações | OK | Cartão "Visitas ao portal" (7d/30d); agora o PDP público registra a impressão (`POST /api/public/views` + `ViewTracker`) |
+| 4.3 | Leads recebidos | OK | Cartão "Funil de leads" (30d + 7d + conversão) |
+| 4.4 | Solicitações de visita | OK | Novo cartão "Visitas solicitadas" — leads com `payload.schedule` (7d/30d) |
+| 4.5 | Contatos por WhatsApp | OK | Novo cartão "Contatos por WhatsApp" — CTA `wa.me` registra lead anônimo (`payload.channel = "whatsapp"`) |
+| 4.6 | Imóveis mais visualizados | OK | "Destaques · 7 dias" (`topProperties` por views 30d) |
+| 4.7 | Imóveis com maior geração de leads | OK | Novo ranking "Geração de leads" (`topByLeads` por leads 30d) |
+| 4.8 | Plano contratado + status da assinatura | OK | Cartão "Plano e utilização": nome, código, badge de status (Ativo/Avaliação/Inadimplente/…) |
+| 4.9 | Próximo vencimento | OK | Bloco de assinatura com `nextInvoiceDueAt`/`currentPeriodEnd` e fim de trial (TRIAL) |
+| 4.10 | Limites: imóveis, usuários e destaques | OK | Barras de utilização (imóveis, usuários, leads/mês, destaques) + créditos de destaque disponíveis; limites lidos dos campos tipados do plano |
+
+### Testes manuais realizados (via HTTP)
+
+1. `POST /api/public/views` → **201** (registra impressão de imóvel público).
+2. `POST /api/public/leads` com `channel:"whatsapp"` (sem nome) → **201**, lead
+   anônimo criado e roteado (interno/externo).
+3. `GET /api/analytics/dashboard` com a sessão do assinante → retornou
+   `statusBreakdown`, `utilization` (pro: 500 imóveis/10 usuários/5000 leads/30
+   destaques), `subscription` (ACTIVE, R$499/mês, próximo vencimento),
+   `visits30d`, `whatsapp30d`, `topProperties` e `topByLeads`.
+4. `/dashboard` renderizando **200** com os novos cards.
+
+---
+
+## Correções aplicadas após a auditoria (Item 4)
+
+1. **Visualizações não fluíam do portal** — o PDP público não registrava
+   impressões (só existia o endpoint autenticado, nunca chamado). Criado
+   `POST /api/public/views` (rate-limited, fingerprint de IP não reversível)
+   e `ViewTracker.tsx` (1 impressão por imóvel por sessão, não-bloqueante).
+2. **"Contatos por WhatsApp" não eram registrados** — o CTA era só um deep-link.
+   Agora o clique também captura um lead anônimo (`channel:"whatsapp"`, sem PII),
+   e o `publicRealEstateLeadSchema` aceita o canal (nome obrigatório apenas no
+   formulário).
+3. **Solicitações de visita** — passaram a ser contabilizadas nos novos funis
+   `snapshot.visits7d/30d` (leads com `payload.schedule`).
+4. **"Imóveis com maior geração de leads"** — novo ranking `topByLeads`
+   (groupBy por `propertyId`, 30 dias) + widget "Geração de leads".
+5. **Plano/assinatura/vencimento fora do painel** — o cartão de plano passou a
+   exibir status da assinatura, próximo vencimento e fim de trial, além das
+   barras de limite (incluindo destaques e créditos disponíveis).
+6. **Limites lidos do JSON legado** — o snapshot lia `plan.features`
+   (shape antigo); agora lê os campos tipados (`maxProperties/maxUsers/maxLeads/
+   highlightCredits`) com fallback para o JSON.
+7. **Bugg de isolamento no snapshot** — `prisma.tenant.findFirst({})` não é
+   tenant-scoped (Tenant é modelo de plataforma) e retornava plano de outro
+   assinante; corrigido para `findUnique({ where: { id: tenantId } })` usando o
+   tenant da sessão.
+8. **Nova rota pública no teste de segregação** — `public/views` adicionado a
+   `PUBLIC_ROUTES` (`segregation-audit.test.ts`).
+
+---
+
 ## Correções aplicadas após a auditoria (Item 3)
 
 1. **Middleware bloqueando o cadastro** — `/register` e `/api/register` não
@@ -123,5 +183,6 @@ corrigidas e o fluxo foi testado de ponta a ponta via HTTP.
 - `npx tsc --noEmit` — sem erros
 - `next lint` — sem warnings ou erros
 - `vitest run` — 208/208 testes passando
-- `next build` — build de produção OK (inclui `/favoritos` e `/api/public/listings`)
-- Testes de segregação de dados (tenant A nunca lê dados de B) — verdes, incluindo as rotas de item 3
+- Testes de segregação de dados (tenant A nunca lê dados de B) — verdes,
+  incluindo as rotas públicas de itens 3 e 4
+- Seed demo: KPIs do painel populados (views, visitas, WhatsApp) de forma idempotente

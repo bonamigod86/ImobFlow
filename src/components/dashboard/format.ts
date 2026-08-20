@@ -113,3 +113,11 @@ export function formatCount(value: number): string {
 export function formatPct(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
 }
+
+/** Format an ISO date string as pt-BR (dd/mm/yyyy). */
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}

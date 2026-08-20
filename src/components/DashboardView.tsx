@@ -9,6 +9,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { PropertyManager } from "@/components/dashboard/PropertyManager";
 import { TopProperties } from "@/components/dashboard/TopProperties";
+import { TopLeads } from "@/components/dashboard/TopLeads";
 import { PlatformEmptyState } from "@/components/dashboard/PlatformEmptyState";
 import type { DashboardSnapshot, PropertyRow, StatusCounts, TopPropertyView } from "@/components/dashboard/types";
 import { priceForRow } from "@/components/dashboard/format";
@@ -104,6 +105,27 @@ export default function DashboardView({ user, tenant, actions }: DashboardViewPr
         title: item.title,
         views7d: item.views7d,
         leads7d: item.leads7d,
+        leads30d: item.leads30d,
+        conversionRate: item.conversionRate,
+        slug: property?.slug ?? null,
+        coverImage: property?.coverImage ?? null,
+        category: property?.category ?? "OTHER",
+        priceLabel: property ? priceForRow(property) : undefined,
+      };
+    });
+  }, [load, rowsById]);
+
+  const topByLeads: TopPropertyView[] = useMemo(() => {
+    if (load.status !== "ready" || !load.snapshot) return [];
+    return load.snapshot.topByLeads.slice(0, 5).map((item) => {
+      const property = rowsById.get(item.id);
+      return {
+        id: item.id,
+        code: item.code,
+        title: item.title,
+        views7d: item.views7d,
+        leads7d: item.leads7d,
+        leads30d: item.leads30d,
         conversionRate: item.conversionRate,
         slug: property?.slug ?? null,
         coverImage: property?.coverImage ?? null,
@@ -150,7 +172,10 @@ export default function DashboardView({ user, tenant, actions }: DashboardViewPr
               canDelete={canDelete}
               onChanged={() => void refresh()}
             />
-            <TopProperties top={topProperties} loading={load.status === "loading"} />
+            <div className="space-y-6">
+              <TopProperties top={topProperties} loading={load.status === "loading"} />
+              <TopLeads top={topByLeads} loading={load.status === "loading"} />
+            </div>
           </div>
         </>
       )}
