@@ -74,6 +74,18 @@ export interface DomainEventMap {
     leadId: string;
     error: string;
   };
+  /** A durable webhook delivery was created for a lead (routing decision). */
+  "lead.dispatch": {
+    tenantId: string;
+    leadId: string;
+    deliveryId: string;
+    endpointId: string;
+    endpointName: string;
+    matchedRuleId: string | null;
+    matchedRuleName: string | null;
+    leadType: string;
+    origin: string;
+  };
   "billing.event.received": {
     provider: string;
     eventId: string;

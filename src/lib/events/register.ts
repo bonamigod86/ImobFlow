@@ -85,6 +85,25 @@ export function registerAuditSubscribers(): void {
     });
   });
 
+  eventBus.on("lead.dispatch", (p) => {
+    AuditService.logAsync({
+      action: p.matchedRuleId ? AUDIT_ACTIONS.LEAD_ROUTED : AUDIT_ACTIONS.LEAD_DISPATCHED,
+      entity: "WebhookDelivery",
+      entityId: p.deliveryId,
+      tenantId: p.tenantId,
+      userId: null,
+      details: {
+        leadId: p.leadId,
+        endpointId: p.endpointId,
+        endpointName: p.endpointName,
+        matchedRuleId: p.matchedRuleId,
+        matchedRuleName: p.matchedRuleName,
+        leadType: p.leadType,
+        origin: p.origin,
+      },
+    });
+  });
+
   eventBus.on("integration.parked", (p) => {
     AuditService.logAsync({
       action: AUDIT_ACTIONS.WEBHOOK_FAILED,

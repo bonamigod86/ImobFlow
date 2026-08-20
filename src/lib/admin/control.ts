@@ -83,6 +83,12 @@ export interface MasterControlData {
     totalFailed: number;
     dlqFailed: number;
   };
+  deliveries: {
+    byStatus: Array<{ status: string; count: number }>;
+    failedLast24h: number;
+    stuckInFlight: number;
+    avgAttempts: number | null;
+  };
   tenants: MasterTenantRow[];
   dunning: DunningRow[];
   audit: AuditRow[];
@@ -145,6 +151,7 @@ export async function getMasterControlData(): Promise<MasterControlData> {
     auditQuery,
     health,
     queues,
+    deliveryMetrics,
   ] = await Promise.all([
     // KPI revenue/MRR for the trailing 30 days.
     getFinancialSnapshot({ from: start, to: new Date(now) }),
@@ -196,6 +203,7 @@ export async function getMasterControlData(): Promise<MasterControlData> {
     }),
     loadHealth(),
     loadQueueMetrics(),
+    loadDeliveryMetrics(),
   ]);
 
   // Single-pass invoice aggregation (pending value + earliest due date).
@@ -282,6 +290,7 @@ export async function getMasterControlData(): Promise<MasterControlData> {
     },
     health,
     queues,
+    deliveries: deliveryMetrics,
     tenants,
     dunning,
     audit,
@@ -303,6 +312,37 @@ async function loadHealth(): Promise<HealthState> {
     redis: redisUp ? "up" : "down",
     emailProvider: provider,
     email: redisUp ? email : "down",
+  };
+}
+
+/** Integration-layer health: persisted webhook deliveries by status, failures
+ *  in the last 24h, stuck IN_FLIGHT rows (orphaned jobs — reconciler target)
+ *  and the average attempt count across deliveries. */
+async function loadDeliveryMetrics() {
+  const [
+    byStatus,
+    failedLast24h,
+    stuckInFlight,
+    attemptStats,
+  ] = await Promise.all([
+    prismaUnscoped.webhookDelivery.groupBy({
+      by: ["status"],
+      _count: { _all: true },
+    }),
+    prismaUnscoped.webhookDelivery.count({
+      where: { status: "FAILED", updatedAt: { gte: new Date(Date.now() - DAY_MS) } },
+    }),
+    prismaUnscoped.webhookDelivery.count({
+      where: { status: "IN_FLIGHT", updatedAt: { lt: new Date(Date.now() - 10 * 60_000) } },
+    }),
+    prismaUnscoped.webhookDelivery.aggregate({ _avg: { attemptsCount: true } }),
+  ]);
+
+  return {
+    byStatus: byStatus.map((row) => ({ status: row.status, count: row._count._all })),
+    failedLast24h,
+    stuckInFlight,
+    avgAttempts: attemptStats._avg.attemptsCount ?? null,
   };
 }
 

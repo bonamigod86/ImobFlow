@@ -365,6 +365,35 @@ comparar em tempo constante.
   fazem parte do repositório/deploy. O receptor valida
   `X-Saas-Imob-Signature` (HMAC-SHA256, §3.2) e usa `x-idempotency-key` para
   deduplicar reentregas.
+- **Monitoramento/auditoria**: o painel MASTER (`GET /api/admin/control`)
+  agrega entregas por status, falhas em 24h, `IN_FLIGHT` presos e média de
+  tentativas; cada decisão de roteamento grava `LEAD_ROUTED`/`LEAD_DISPATCHED`
+  e cada tentativa fica em `WebhookDeliveryAttempt`.
+
+### 3.5 Integrando um novo sistema (extensibilidade)
+
+Dois caminhos, sem tocar na lógica de leads:
+
+1. **Por configuração (sem código)** — se o destino aceitar um dos contratos
+   já existentes:
+   - `POST /api/webhook-endpoints` com `{ name, scope, baseUrl: string, method,
+     strategy: "CRM_DEFAULT" | "FINANCE_DEFAULT" | "CUSTOM_JSON", timeoutMs,
+     hmacSecret }`. O segredo é criptografado em repouso (AES-256-GCM).
+   - Imobiliário: o lead dispara para todo endpoint `REAL_ESTATE` ativo do
+     tenant/plataforma automaticamente. Financeiro: crie uma `RoutingRule`
+     (`POST /api/routing-rules`) apontando para um endpoint `FINANCIAL` — a
+     regra mais específica vence (tenant antes de plataforma).
+2. **Por adapter (contrato novo)** — um novo formato de payload é um único
+   ponto de mudança, isolado:
+   - Adicione uma função **pura** em `src/lib/integrations/strategies.ts`
+     (entrada: `LeadEnvelope`; saída: objeto JSON — sem imports de DB, sem
+     fetch), registre-a em `ADAPTERS` e use o valor no campo `strategy`.
+   - O bridge `envelope.ts` converte linhas → `LeadEnvelope`; a entrega
+     (HMAC, idempotência, retry, DLQ, monitoramento) é compartilhada — nada
+     mais muda.
+
+O SPI garante que o sistema externo permaneça **tecnicamente independente**
+(webhook HTTP assinado, sem banco compartilhado, sem dependência direta).
 
 ---
 

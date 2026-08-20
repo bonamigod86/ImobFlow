@@ -5,23 +5,30 @@ import { pingRedis } from "@/lib/redis/client";
 /**
  * Delivery reconciler (worker-only, no Next server involvement).
  *
- * Recovers webhook transmissions whose queue job never existed: when Redis is
- * down during `createDeliveryAndEnqueue` the lead is still persisted and the
- * durable `WebhookDelivery` row lands `PENDING` with `attemptsCount = 0` — but
- * no BullMQ job was ever added. Without a sweep those deliveries would be
- * silently lost forever (zero-loss guarantee violated).
+ * Recovers webhook transmissions whose queue job never existed or was lost:
+ *   PENDING  — persisted with `attemptsCount = 0` when Redis is down during
+ *              `createDeliveryAndEnqueue`: the lead is saved and the durable
+ *              row lands PENDING, but no BullMQ job was ever added.
+ *   IN_FLIGHT — a job whose worker crashed mid-flight (or whose Redis job was
+ *              otherwise lost): status stays IN_FLIGHT with attempts>0.
+ * Without a sweep, deliveries in either state would be lost forever
+ * (zero-loss guarantee violated).
  *
  * Strategy (safe under every Redis topology):
- *   - candidates: `PENDING`, `attemptsCount = 0`, `nextAttemptAt = NULL`,
- *     `createdAt` older than a grace window. A row claimed by any worker is
- *     moved to `IN_FLIGHT` within milliseconds (HTTP timeout is bounded), so an
- *     old row in this state was never picked up — re-enqueue is correct.
+ *   - candidates: PENDING with `attemptsCount = 0`, `nextAttemptAt = NULL`,
+ *     `createdAt` older than a grace window, OR stale IN_FLIGHT with
+ *     `updatedAt` older than a longer window (way beyond the bounded retry
+ *     budget — max backoff 2s→32s + 10s HTTP timeout per attempt). A row
+ *     claimed by any live worker transitions status within milliseconds, so an
+ *     old row in these states was effectively never/last processed.
  *   - idempotent: the jobId (`webhook:<endpointId>:lead.created:<leadId>`) is
  *     stable, so re-adding a job still waiting or active in Redis is a no-op;
- *     if it already completed the row would no longer be PENDING.
+ *     if it already completed the row would no longer be PENDING/IN_FLIGHT.
  */
 const SWEEP_INTERVAL_MS = 60_000;
 const UNCLAIMED_AGE_MS = 90_000;
+/** IN_FLIGHT older than this (10 min >> max retry window) is considered lost. */
+const STUCK_IN_FLIGHT_AGE_MS = 10 * 60_000;
 const MAX_STALE_PER_SWEEP = 250;
 
 export async function reclaimStalePendingDeliveries(now = Date.now()): Promise<number> {
@@ -29,13 +36,23 @@ export async function reclaimStalePendingDeliveries(now = Date.now()): Promise<n
     return 0;
   }
 
-  const cutoff = new Date(now - UNCLAIMED_AGE_MS);
+  const orphanCutoff = new Date(now - UNCLAIMED_AGE_MS);
+  const stuckCutoff = new Date(now - STUCK_IN_FLIGHT_AGE_MS);
   const stale = await prismaUnscoped.webhookDelivery.findMany({
     where: {
-      status: "PENDING",
-      attemptsCount: 0,
-      nextAttemptAt: null,
-      createdAt: { lt: cutoff },
+      OR: [
+        {
+          status: "PENDING",
+          attemptsCount: 0,
+          nextAttemptAt: null,
+          createdAt: { lt: orphanCutoff },
+        },
+        {
+          status: "IN_FLIGHT",
+          attemptsCount: { gt: 0 },
+          updatedAt: { lt: stuckCutoff },
+        },
+      ],
     },
     include: {
       endpoint: { select: { id: true, baseUrl: true, method: true, timeoutMs: true } },
@@ -56,7 +73,7 @@ export async function reclaimStalePendingDeliveries(now = Date.now()): Promise<n
         payload: {},
         timeoutMs: delivery.endpoint.timeoutMs ?? undefined,
         deliveryId: delivery.id,
-        attemptNumber: 0,
+        attemptNumber: delivery.attemptsCount,
       });
       reenqueued += 1;
     } catch (error) {
@@ -65,7 +82,7 @@ export async function reclaimStalePendingDeliveries(now = Date.now()): Promise<n
   }
 
   if (reenqueued > 0) {
-    console.info(`[workers] delivery-reconciler re-enqueued ${reenqueued} stale PENDING deliveries.`);
+    console.info(`[workers] delivery-reconciler re-enqueued ${reenqueued} stale deliveries.`);
   }
   return reenqueued;
 }

@@ -461,6 +461,10 @@ segregação multi-tenant, desacoplamento da camada de integração, mecanismos)
 | 11.9 | Retry | OK | BullMQ `attempts: 5` + backoff exponencial base 2s; classificação `429/5xx/network/timeout` → retryable, `4xx` → `NonRetryableError` + DLQ `DEAD_LETTERED`; tentativas duráveis (`WebhookDeliveryAttempt` escrita antes do HTTP) |
 | 11.10 | Filas quando necessárias | OK | 7 filas BullMQ (routing, webhook, media, import, billing, email + DLQs); **fail-open com reconciler**: se o Redis cai no enqueue, o lead é salvo e o reconciler re-enfileira entregas `PENDING` órfãs (zero-loss) |
 | 11.11 | Sem acoplamento que impeça substituição | OK | Troca entre `CUSTOM_JSON/CRM_DEFAULT/FINANCE_DEFAULT` por mudança de `strategy`; contrato novo exige novo adapter puro (único ponto de mudança, isolado) |
+| 11.12 | Tratamento de falhas (fim-a-fim) | OK | Retry classificado (429/5xx/network→retryable; 4xx→DLQ `DEAD_LETTERED`), tentativas duráveis escritas **antes** do HTTP, DLQ + replay; reconciler recupera **órfãos `PENDING` e `IN_FLIGHT`** (job perdido) |
+| 11.13 | Logs e auditoria | OK | `WebhookDeliveryAttempt` (payload, assinatura, status, corpo, latência por tentativa) + `AuditLog`: `LEAD_ROUTED`/`LEAD_DISPATCHED` (decisão de roteamento), `WEBHOOK_DELIVERED`/`WEBHOOK_FAILED`, `JOB_FAILED`/`JOB_REPLAYED`, `ENDPOINT_*`, `RoutingRule` |
+| 11.14 | Monitoramento | OK | `GET /api/admin/control` (MASTER): health (db/redis/email), filas BullMQ + DLQ, **entregas de webhook por status / falhas 24h / `IN_FLIGHT` presos / média de tentativas**, dunning, trilha de auditoria; `GET /api/webhook-deliveries` (assinante) |
+| 11.15 | Integrar outros sistemas futuramente | OK | Extensível por **configuração** (novo destino = `POST /api/webhook-endpoints`) e por **adapter puro** (novo contrato = função em `strategies.ts` + enum); `CUSTOM_JSON` passthrough atende qualquer enum sem código; SPI documentado (API spec §3.5) |
 
 ### Testes/smoke realizados
 
@@ -496,6 +500,24 @@ segregação multi-tenant, desacoplamento da camada de integração, mecanismos)
 4. **Erro permanente queimando retry budget** — `ImportBatch` inexistente
    lançava `Error` retryable (5 tentativas inúteis antes do DLQ); agora
    `NonRetryableError` (`src/lib/imports/import-engine.ts`).
+
+5. **Órfãos `IN_FLIGHT` não eram recuperados** — um crash de worker (ou perda
+   de job no Redis) deixava a entrega eternamente `IN_FLIGHT` (tentativa gravada
+   antes do HTTP, mas sem resolução). O reconciler agora também re-enfileira
+   entregas `IN_FLIGHT` com `updatedAt` > 10 min (muito além da janela de retry
+   limitada: backoff 2s→32s + timeout 10s), continuando de `attemptsCount`
+   (`src/lib/integrations/delivery-reconciler.ts`).
+6. **Roteamento/configuração não auditados** — ações `LEAD_ROUTED`/
+   `LEAD_DISPATCHED` existiam mas nunca eram emitidas. Novo evento `lead.dispatch`
+   (em `createDeliveryAndEnqueue`): grava a decisão com `matchedRule`,
+   endpoint, origem, tipo e tipo de lead; listeners em
+   `src/lib/events/register.ts`.
+7. **Painel MASTER sem visão das entregas persistidas** — `admin/control` só via
+   filas/DLQ (Redis). Novo `loadDeliveryMetrics` em `src/lib/admin/control.ts`:
+   `deliveries.byStatus`, `failedLast24h`, `stuckInFlight`, `avgAttempts`.
+8. **Extensibilidade não documentada** — nova seção **§3.5** na
+   `API_AND_WEBHOOK_SPECIFICATION.md` ("Integrando um novo sistema") com o SPI
+   de adapters + receita de configuração.
 
 ---
 

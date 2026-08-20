@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prismaUnscoped } from "@/lib/prisma/client";
 import { QueueManager } from "@/lib/queues/queue-manager";
+import { eventBus } from "@/lib/events/event-bus";
 import { AuditService } from "@/lib/audit/audit-service";
 import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 import { consentTextFor, CURRENT_CONSENT_VERSION } from "@/lib/leads/consent";
@@ -268,6 +269,9 @@ async function createDeliveryAndEnqueue(data: {
   method: string;
   timeoutMs: number;
   matchedRuleId?: string | null;
+  matchedRuleName?: string | null;
+  leadType: string;
+  origin: string;
 }): Promise<DispatchResult> {
   const key = idempotencyKey({
     tenantId: data.tenantId,
@@ -299,6 +303,18 @@ async function createDeliveryAndEnqueue(data: {
     deliveryId: delivery.id,
     attemptNumber: delivery.attemptsCount + 1,
   }).catch(() => null);
+
+  eventBus.emit("lead.dispatch", {
+    tenantId: data.tenantId,
+    leadId: data.leadId,
+    deliveryId: delivery.id,
+    endpointId: data.endpointId,
+    endpointName: data.endpointName,
+    matchedRuleId: data.matchedRuleId ?? null,
+    matchedRuleName: data.matchedRuleName ?? null,
+    leadType: data.leadType,
+    origin: data.origin,
+  });
 
   return {
     deliveryId: delivery.id,
@@ -395,6 +411,8 @@ export async function captureRealEstateLead(input: RealEstateLeadInput): Promise
         baseUrl: endpoint.baseUrl,
         method: "POST",
         timeoutMs: endpoint.timeoutMs,
+        leadType: lead.type,
+        origin: lead.origin,
       }),
     );
   }
@@ -551,6 +569,9 @@ export async function captureFinancialLead(input: FinancialLeadInput): Promise<L
         method: "POST",
         timeoutMs: ep?.timeoutMs ?? 10_000,
         matchedRuleId: rule?.id ?? null,
+        matchedRuleName: rule?.name ?? null,
+        leadType: lead.type,
+        origin: lead.origin,
       }),
     );
   }
