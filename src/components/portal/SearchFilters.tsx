@@ -115,7 +115,7 @@ export function SearchFilters({
               type="search"
               defaultValue={initial.q ?? searchParams.get("q") ?? ""}
               placeholder="Cidade, bairro, código…"
-              className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
               onKeyDown={(e) => {
                 if (e.key === "Enter") apply({ q: (e.target as HTMLInputElement).value });
               }}
@@ -129,7 +129,7 @@ export function SearchFilters({
             type="search"
             defaultValue={initial.neighborhood ?? searchParams.get("neighborhood") ?? ""}
             placeholder="Ex.: Jardins, Moema…"
-            className="w-full rounded-lg border border-slate-200 py-2 pl-3 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             onKeyDown={(e) => {
               if (e.key === "Enter") apply({ neighborhood: (e.target as HTMLInputElement).value });
             }}

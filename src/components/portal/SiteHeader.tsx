@@ -21,13 +21,13 @@ export function SiteHeader() {
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 md:flex">
-          <Link href="/imoveis" className="transition-colors hover:text-brand-600">
+          <Link href="/imoveis/venda" className="transition-colors hover:text-brand-600">
             Comprar
           </Link>
-          <Link href="/imoveis?target=RENT" className="transition-colors hover:text-brand-600">
+          <Link href="/imoveis/aluguel" className="transition-colors hover:text-brand-600">
             Alugar
           </Link>
-          <Link href="/imoveis?category=HOUSE" className="transition-colors hover:text-brand-600">
+          <Link href="/imoveis/casa" className="transition-colors hover:text-brand-600">
             Casas
           </Link>
         </nav>
