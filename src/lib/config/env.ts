@@ -119,6 +119,13 @@ const envSchema = z.object({
   RATE_LIMIT_PUBLIC_VIEWS: z.coerce.number().int().min(1).max(1000000).default(120),
   /** Comma-separated allowed origins for the /api/public/* CORS header. */
   CORS_ORIGINS: z.string().optional().default(""),
+
+  // ---------------------------------------------------------------------------
+  // Phase 6 — Privacy / LGPD (Checklist Item 20)
+  // ---------------------------------------------------------------------------
+
+  /** After how many days (from withdrawal) a consent-opted-out lead is anonymized. */
+  GDPR_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
 });
 
 export type Env = z.infer<typeof envSchema>;

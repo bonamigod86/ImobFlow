@@ -717,6 +717,77 @@ assinaturas com filtros e exportação, em `/admin/financial`
 
 ---
 
+## Item 18 — Destaques e monetização adicional
+
+Status: **100% implementado** (entregue nas Fases 5/8 — complementa o item 12).
+Modelo de créditos (1 crédito = 1 dia de destaque), cota mensal renova no
+pagamento, compra avulsa confirma via webhook, período configurável, prioridade,
+início/fim e expiração automática — tudo auditável no ledger.
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 18.1 | Destaques incluídos nos planos | OK | `Plan.highlightCredits`; `grantPlanAllotment` credita a cota a cada `invoice.paid` |
+| 18.2 | Compra avulsa | OK | `HighlightPurchase` (PENDING→PAID) via `createHighlightPurchase`; `checkout.completed`/`[id]/pay` confirmam e `creditHighlights(kind TOPUP)` credita (`19.6` também no `BillingAdminConsole`) |
+| 18.3 | Período configurável | OK | `activateHighlight(input.days)` — duração em dias arbitrária |
+| 18.4 | Prioridade | OK | `priorityBoost` em `PropertyHighlight` (orderBy no portal/listas) |
+| 18.5 | Início e fim | OK | `startsAt`/`endsAt` na janela de destaque |
+| 18.6 | Expiração automática | OK | `expireDueHighlights` (runner no `billing.worker` diário + `POST /api/admin/billing/scan`) remove a janela e limpa `isFeatured` |
+| 18.7 | Histórico | OK | Ledger append-only `HighlightCreditLedger` (balances) + `listPurchases`; `GET /api/billing/highlights` expõe saldo/janelas/compras |
+
+### Testes/smoke (Item 18)
+
+- Suíte `highlights.test.ts` (Fase 5) cobre plano→cota, compra avulsa→crédito,
+  ativação e expiração.
+- Prova real do item 12/13 já exercitou a cota do plano no `invoice.paid` e o
+  smoke de billing da acme (saldo de destaques no console).
+
+## Item 19 — Usuários e permissões
+
+Status: **100% implementado**. Perfis `MASTER`, `OWNER`, `MANAGER`, `AGENT`,
+`RECEPTIONIST` com RBAC por ação (`src/lib/rbac/`) e segregação multi-tenant em
+todo handler (`withApiRoute` + tenant-extension do Prisma).
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 19.1 | Perfis disponíveis | OK | `enum UserRole` (MASTER/OWNER/MANAGER/AGENT/RECEPTIONIST) |
+| 19.2 | Controle de acesso por função | OK | `PERMISSION_MATRIX` (`src/lib/rbac/matrix.ts`) mapeia cada ação por papel; `hasPermission`/`withApiRoute`/`getActionsForRole` (UI); acciones `USERS_*`, `PROPERTIES_*`, `LEADS_*`, etc. |
+| 19.3 | Gestão de membros | OK (**novo**) | `src/lib/users/team-service.ts` (listar/criar/editar/excluir com papel); rotas `GET/POST /api/team/users`, `PATCH/DELETE /api/team/users/[id]`; console `/dashboard/team` |
+| 19.4 | Salvaguardas | OK | MASTER nunca atribuível a membro; não excluir a própria conta; nunca remover o **último** OWNER ativo |
+| 19.5 | Segregação multi-tenant | OK | `withApiRoute` resolve o tenant da sessão + tenant-extension auto-scopam toda consulta; serviços estampam `tenantId` explicitamente (leak impossível) |
+
+### Testes/smoke (Item 19)
+
+- `src/lib/users/team-service.test.ts` **6 testes** (criação com hash temporário +
+  welcome/audit, e-mail duplicado, bloqueio de papel MASTER, salvaguarda do
+  último OWNER, alteração de perfil e auto-exclusão).
+- Prova real: `listTeamUsers(acme)` → OWNER/MANAGER/AGENT/RECEPTIONIST presentes
+  (perfis de exemplo).
+
+## Item 20 — LGPD e privacidade
+
+Status: **100% implementado**. `privacy by design`: consentimento obrigatório e
+persistido em toda captura; retirada de consentimento com anonimização imediata;
+política de retenção; e rastreabilidade dos envios a sistemas externos.
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 20.1 | Consentimento obrigatório | OK | `LeadConsent` + `consentSchema` (LGPD) exigido em toda captura pública |
+| 20.2 | Registro de consentimento (data/hora, origem, finalidade) | OK | `LeadConsent` grava `textVersion`, `consentText` (finalidade), `grantedAt`, `ipAddress`, `originUrl` |
+| 20.3 | Retirada → exclusão/anonimização | OK (**novo**) | `withdrawConsent` (gdpr.ts) marca `optedOut/optedOutAt` e anonimiza PII do lead; rotas `GET /api/leads/[id]/privacy`, `POST /api/leads/[id]/privacy/withdraw` |
+| 20.4 | Políticas de retenção | OK (**novo**) | `runRetentionSweep(retentionDays)` anonimiza lead retirado além de `GDPR_RETENTION_DAYS` (env); `POST /api/admin/privacy/sweep` (MASTER) dispara manual |
+| 20.5 | Rastreabilidade a sistemas externos | OK | `WebhookDelivery`/`Attempt` persistem cada transmissão antes do HTTP; expostos por lead em `getLeadPrivacy.deliveries` + trilha de auditoria |
+| 20.6 | Console de privacidade | OK (**novo**) | `/dashboard/privacy` (PrivacyConsole) mostra consente/retirada e permite anonimizar |
+
+### Testes/smoke (Item 20)
+
+- `src/lib/privacy/gdpr.test.ts` **4 testes** (consent+rastreabilidade, erro de
+  fora do tenant, retirada→anonimização, sweep de retenção).
+- Prova real: `getLeadPrivacy` de um lead da acme retornou consentimento
+  (versão/finalidade) + 1 envio externo rastreado.
+- `npx tsc --noEmit` limpo, `next lint` limpo, `vitest run` **241/241**.
+
+---
+
 ## Correções aplicadas após a auditoria (Item 5)
 
 1. **Duplicar conflitava no `externalCode`** — `duplicateProperty` copiava o
@@ -812,7 +883,7 @@ assinaturas com filtros e exportação, em `/admin/financial`
 
 - `npx tsc --noEmit` — sem erros
 - `next lint` — sem warnings ou erros
-- `vitest run` — 231/231 testes passando
+- `vitest run` — 241/241 testes passando
 - Testes de segregação de dados (tenant A nunca lê dados de B) — verdes,
   incluindo as rotas públicas de itens 3 e 4
 - Seed demo: KPIs do painel populados (views, visitas, WhatsApp) de forma idempotente
@@ -842,3 +913,11 @@ assinaturas com filtros e exportação, em `/admin/financial`
 - Itens 16/17 (Painel Master + Gestão financeira): painel executivo com KPIs de
   clientes/imóveis/leads/financeiro e a gestão financeira das assinaturas com
   filtros e exportação CSV validados com o pipeline real (base de dados dev)
+- Item 18 (destaques/monetização): cota do plano, compra avulsa, período,
+  prioridade, início/fim, expiração automática e histórico (ledger) — destaque
+  de Fase 5
+- Item 19 (usuários/permissões): perfis próprio/gerente/corretor/atendente com
+  RBAC e gestão de membros com salvaguardas (não excluir o último OWNER)
+- Item 20 (LGPD): consentimento por data/hora/origem/finalidade, retirada com
+  anonimização imediata, política de retenção e rastreabilidade dos envios a
+  sistemas externos

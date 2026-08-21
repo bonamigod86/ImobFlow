@@ -147,6 +147,16 @@ export interface DomainEventMap {
     invoiceId: string;
     amountCents: number;
   };
+  // --- Phase 6 — privacy / LGPD (Checklist Item 20) --------------------------
+  "consent.withdrawn": {
+    tenantId: string;
+    leadId: string;
+    anonymized: boolean;
+  };
+  "consent.retention_anonymized": {
+    tenantId: string;
+    leadId: string;
+  };
   "billing.highlight.activated": {
     tenantId: string;
     propertyId: string;

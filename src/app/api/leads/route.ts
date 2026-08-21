@@ -68,6 +68,7 @@ export const GET = withApiRoute(ACTIONS.LEADS_READ, async (_ctx, req) => {
             state: true,
           },
         },
+        consent: { select: { textVersion: true, optedOut: true } },
       },
     }),
     prisma.lead.count({ where }),
