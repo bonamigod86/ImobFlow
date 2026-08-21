@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Image as ImageIcon, Loader2, Star, Trash2, Upload, Video } from "lucide-react";
+import { Image as ImageIcon, Loader2, Star, StarOff, Trash2, Upload, Video, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -202,6 +202,7 @@ export function MediaManagerDialog({
 
         <DialogFooter className="gap-2">
           <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>
+            <X className="mr-1 h-4 w-4" />
             Fechar
           </Button>
         </DialogFooter>
@@ -223,55 +224,48 @@ function MediaTile({
 }) {
   const src = `/api/media/${item.id}/bytes`;
   return (
-    <div className="group relative overflow-hidden rounded-lg border border-ink-700 bg-ink-950/60">
-      {item.kind === "IMAGE" ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="Mídia do imóvel" className="aspect-[4/3] w-full object-cover" />
-      ) : (
-        <video
-          src={src}
-          preload="metadata"
-          controls
-          className="aspect-[4/3] w-full bg-black object-cover"
-        />
-      )}
-      <div className="absolute right-1.5 top-1.5 flex items-center gap-1">
-        {primary && (
-          <Badge variant="secondary" className="gap-1 text-[0.65rem]">
-            <Star className="h-3 w-3 fill-amber-300 text-amber-300" />
-            Capa
-          </Badge>
-        )}
-        {item.status !== "READY" && (
-          <Badge variant="outline" className="text-[0.65rem]">
-            {item.status}
-          </Badge>
-        )}
-      </div>
-      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-ink-950/90 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-        {onPrimary ? (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="text-ink-200 hover:text-amber-300"
-            aria-label="Definir como imagem principal (capa)"
-            title="Definir como imagem principal (capa)"
-            onClick={onPrimary}
-          >
-            {primary ? <Star className="h-4 w-4 fill-amber-300 text-amber-300" /> : <Star className="h-4 w-4" />}
-          </Button>
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="relative">
+        {item.kind === "IMAGE" ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt="Mídia do imóvel" className="aspect-[4/3] w-full object-cover" />
         ) : (
-          <span />
+          <video
+            src={src}
+            preload="metadata"
+            controls
+            className="aspect-[4/3] w-full bg-black object-cover"
+          />
+        )}
+        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+          {primary && (
+            <Badge variant="success" className="gap-1">
+              <Star className="h-3 w-3 fill-amber-300 text-amber-300" />
+              Capa
+            </Badge>
+          )}
+          {item.status !== "READY" && (
+            <Badge variant="outline" className="text-[0.65rem]">
+              {item.status}
+            </Badge>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 border-t border-slate-100 p-2">
+        {onPrimary && (
+          <Button size="sm" variant="secondary" className="flex-1" onClick={onPrimary}>
+            {primary ? <StarOff className="h-3.5 w-3.5" /> : <Star className="h-3.5 w-3.5" />}
+            {primary ? "Remover capa" : "Tornar capa"}
+          </Button>
         )}
         <Button
+          size="sm"
           variant="ghost"
-          size="icon-sm"
-          className="text-ink-200 hover:text-red-300"
-          aria-label="Remover mídia"
-          title="Remover mídia"
+          className={onPrimary ? "text-red-600 hover:bg-red-50 hover:text-red-700" : "flex-1 text-red-600 hover:bg-red-50 hover:text-red-700"}
           onClick={onRemove}
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-3.5 w-3.5" />
+          Remover
         </Button>
       </div>
     </div>
