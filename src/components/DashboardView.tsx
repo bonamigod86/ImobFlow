@@ -11,6 +11,7 @@ import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { PropertyManager } from "@/components/dashboard/PropertyManager";
 import LeadsTable from "@/components/dashboard/LeadsTable";
 import TeamUsersConsole from "@/components/dashboard/TeamUsersConsole";
+import PlanCards from "@/components/billing/PlanCards";
 import { TenantProfileForm } from "@/components/dashboard/TenantProfileForm";
 import { PlatformEmptyState } from "@/components/dashboard/PlatformEmptyState";
 import type { DashboardSnapshot, PropertyRow, StatusCounts } from "@/components/dashboard/types";
@@ -37,7 +38,7 @@ interface SnapshotEnvelope {
   error?: string;
 }
 
-type DashboardTab = "overview" | "properties" | "leads" | "team" | "profile";
+type DashboardTab = "overview" | "properties" | "leads" | "team" | "plans" | "profile";
 
 /**
  * Tenant dashboard — tabbed workspace: Início (executive overview), Imóveis
@@ -124,6 +125,7 @@ export default function DashboardView({ user, tenant, actions }: DashboardViewPr
             <TabsTrigger value="properties">Imóveis</TabsTrigger>
             <TabsTrigger value="leads">Leads</TabsTrigger>
             {canManageUsers && <TabsTrigger value="team">Equipe</TabsTrigger>}
+            <TabsTrigger value="plans">Planos</TabsTrigger>
             <TabsTrigger value="profile">Gerenciar perfil</TabsTrigger>
           </TabsList>
 
@@ -157,6 +159,10 @@ export default function DashboardView({ user, tenant, actions }: DashboardViewPr
               <TeamUsersConsole />
             </TabsContent>
           )}
+
+          <TabsContent value="plans">
+            <PlanCards />
+          </TabsContent>
 
           <TabsContent value="profile">
             <TenantProfileForm />
