@@ -42,9 +42,9 @@ export function HeroSearchForm({ cities = [] }: { cities?: HeroCity[] }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xl shadow-slate-200/70 sm:grid-cols-2 lg:grid-cols-12"
+      className="mx-auto mt-8 flex w-full max-w-5xl flex-col gap-2.5 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xl shadow-slate-200/70 md:flex-row md:items-stretch"
     >
-      <label className="relative lg:col-span-4">
+      <label className="relative min-w-0 md:flex-grow">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           value={q}
@@ -59,7 +59,7 @@ export function HeroSearchForm({ cities = [] }: { cities?: HeroCity[] }) {
         value={city}
         onChange={(e) => setCity(e.target.value)}
         aria-label="Cidade"
-        className="truncate rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100 lg:col-span-2"
+        className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
       >
         <option value="">Todas as cidades</option>
         {cities.map((c) => (
@@ -74,7 +74,7 @@ export function HeroSearchForm({ cities = [] }: { cities?: HeroCity[] }) {
         value={target}
         onChange={(e) => setTarget(e.target.value as "" | Target)}
         aria-label="Finalidade"
-        className="truncate rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100 lg:col-span-2"
+        className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
       >
         <option value="">Venda ou aluguel</option>
         <option value="SALE">Venda</option>
@@ -85,7 +85,7 @@ export function HeroSearchForm({ cities = [] }: { cities?: HeroCity[] }) {
         value={category}
         onChange={(e) => setCategory(e.target.value as "" | Category)}
         aria-label="Categoria"
-        className="truncate rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100 lg:col-span-2"
+        className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
       >
         <option value="">Todas as categorias</option>
         {(Object.keys(CATEGORY_SLUGS) as Category[]).map((cat) => (
@@ -97,7 +97,7 @@ export function HeroSearchForm({ cities = [] }: { cities?: HeroCity[] }) {
 
       <button
         type="submit"
-        className="inline-flex h-11 w-full items-center justify-center whitespace-nowrap rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 lg:col-span-2"
+        className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
       >
         <Search className="mr-2 h-4 w-4" />
         Buscar
