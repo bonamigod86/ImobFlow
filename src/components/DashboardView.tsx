@@ -1,8 +1,9 @@
 "use client";
 
 import type { TenantStatus, UserRole } from "@prisma/client";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, ArrowRight, RefreshCw } from "lucide-react";
 import { useTenant } from "@/lib/tenant/tenant-client-context";
 import { Button } from "@/components/ui/button";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -10,6 +11,7 @@ import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { PropertyManager } from "@/components/dashboard/PropertyManager";
 import { TopProperties } from "@/components/dashboard/TopProperties";
 import { TopLeads } from "@/components/dashboard/TopLeads";
+import LeadsTable from "@/components/dashboard/LeadsTable";
 import { PlatformEmptyState } from "@/components/dashboard/PlatformEmptyState";
 import type { DashboardSnapshot, PropertyRow, StatusCounts, TopPropertyView } from "@/components/dashboard/types";
 import { priceForRow } from "@/components/dashboard/format";
@@ -178,6 +180,24 @@ const canDelete = actions.includes("properties:delete");
               <TopProperties top={topProperties} loading={load.status === "loading"} />
               <TopLeads top={topByLeads} loading={load.status === "loading"} />
             </div>
+          </div>
+
+          {/* Últimos Leads Recebidos — preview + link para a base completa */}
+          <div className="rounded-xl border border-ink-800 bg-ink-900/40 p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight text-ink-50">Últimos leads recebidos</h2>
+                <p className="text-sm text-ink-400">Solicitações mais recentes dos visitantes do portal.</p>
+              </div>
+              <Link
+                href="/dashboard/leads"
+                className="inline-flex items-center gap-1 text-sm font-medium text-brand-400 transition-colors hover:text-brand-300"
+              >
+                Ver base completa
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <LeadsTable limit={5} showHeader={false} />
           </div>
         </>
       )}

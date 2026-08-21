@@ -56,6 +56,7 @@ export const GET = withApiRoute(ACTIONS.LEADS_READ, async (_ctx, req) => {
         status: true,
         payload: true,
         createdAt: true,
+        property: { select: { id: true, code: true, title: true, salePrice: true, rentPrice: true } },
         financeProfile: {
           select: {
             propertyValue: true,
@@ -68,7 +69,7 @@ export const GET = withApiRoute(ACTIONS.LEADS_READ, async (_ctx, req) => {
             state: true,
           },
         },
-        consent: { select: { textVersion: true, optedOut: true } },
+        consent: { select: { textVersion: true, optedOut: true, grantedAt: true } },
       },
     }),
     prisma.lead.count({ where }),
