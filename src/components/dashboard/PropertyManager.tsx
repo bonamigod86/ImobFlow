@@ -323,9 +323,19 @@ function PropertyCard({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon-sm" className="ml-auto" aria-label="Mais ações" title="Mais ações" disabled={busy}>
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" strokeWidth={3} />}
-              </Button>
+              <button
+                type="button"
+                disabled={busy}
+                aria-label="Mais ações"
+                title="Mais ações"
+                className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {busy ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <MoreHorizontal className="h-5 w-5" strokeWidth={2.5} aria-hidden="true" />
+                )}
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => onAction({ kind: "view", property })}>
