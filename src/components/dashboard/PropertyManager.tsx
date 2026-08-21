@@ -310,7 +310,7 @@ function PropertyCard({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="ml-auto" aria-label={`Ações para ${property.title}`} disabled={busy}>
+              <Button variant="ghost" size="icon-sm" className="ml-auto" aria-label="Mais ações" title="Mais ações" disabled={busy}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
               </Button>
             </DropdownMenuTrigger>

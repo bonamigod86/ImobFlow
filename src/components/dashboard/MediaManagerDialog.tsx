@@ -254,7 +254,8 @@ function MediaTile({
             variant="ghost"
             size="icon-sm"
             className="text-ink-200 hover:text-amber-300"
-            aria-label="Definir como imagem principal"
+            aria-label="Definir como imagem principal (capa)"
+            title="Definir como imagem principal (capa)"
             onClick={onPrimary}
           >
             {primary ? <Star className="h-4 w-4 fill-amber-300 text-amber-300" /> : <Star className="h-4 w-4" />}
@@ -267,6 +268,7 @@ function MediaTile({
           size="icon-sm"
           className="text-ink-200 hover:text-red-300"
           aria-label="Remover mídia"
+          title="Remover mídia"
           onClick={onRemove}
         >
           <Trash2 className="h-4 w-4" />
