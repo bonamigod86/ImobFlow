@@ -2,11 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { BedDouble, Car, MapPin, Ruler, Bath } from "lucide-react";
 import type { PublicProperty } from "@/lib/public/types";
-import { CATEGORY_LABELS } from "@/lib/public/types";
+import { CATEGORY_LABELS, CATEGORY_PLACEHOLDERS } from "@/lib/public/types";
 import { locationLabel, priceFor } from "@/lib/public/format";
 import { FavoriteButton } from "@/components/portal/FavoriteButton";
 
-/** Cover image for a listing; falls back to a clean branded gradient tile. */
+/** Cover image for a listing; falls back to the category placeholder or a clean branded tile. */
 export function ListingImage({
   property,
   className = "aspect-[4/3]",
@@ -29,6 +29,21 @@ export function ListingImage({
       />
     );
   }
+
+  const placeholder = CATEGORY_PLACEHOLDERS[property.category];
+  if (placeholder) {
+    return (
+      <Image
+        src={placeholder}
+        alt={CATEGORY_LABELS[property.category]}
+        fill
+        sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+        priority={priority}
+        className={`${className} object-cover`}
+      />
+    );
+  }
+
   return (
     <div
       className={`${className} flex items-center justify-center bg-gradient-to-br from-brand-600 via-brand-500 to-brand-400 text-white`}

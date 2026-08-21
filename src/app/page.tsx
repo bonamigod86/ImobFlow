@@ -32,9 +32,19 @@ export default async function LandingPage() {
       <SiteHeader />
 
       {/* Hero */}
-      <section className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-b from-slate-50 via-white to-white">
-        <div className="pointer-events-none absolute -left-20 top-0 h-72 w-72 rounded-full bg-emerald-100/40 blur-3xl" />
-        <div className="pointer-events-none absolute -right-20 top-10 h-72 w-72 rounded-full bg-sky-100/30 blur-3xl" />
+      <section className="relative overflow-hidden border-b border-slate-100">
+        {/* Semi-transparent backdrop — the portal bg image, dimmed for contrast. */}
+        <div className="absolute inset-0">
+          <Image
+            src="/images/bg.jpg"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-white/70" aria-hidden="true" />
+        </div>
 
         <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:py-24">
           <div className="mx-auto max-w-3xl text-center">

@@ -142,3 +142,19 @@ export const TARGET_SLUGS: Record<PropertyTarget, string> = {
 export const TARGET_FROM_SLUG: Record<string, PropertyTarget> = Object.fromEntries(
   Object.entries(TARGET_SLUGS).map(([target, slug]) => [slug, target as PropertyTarget]),
 );
+
+/**
+ * Static placeholder image per property category (used when a listing has no
+ * cover yet). Files live in `public/images/<categoria>_placeholder.jpg`;
+ * categories without a dedicated asset render the branded gradient tile.
+ */
+export const CATEGORY_PLACEHOLDERS: Record<PropertyCategory, string | null> = {
+  APARTMENT: "/images/apartamento_placeholder.jpg",
+  HOUSE: "/images/casa_placeholder.jpg",
+  COMMERCIAL: "/images/salacomercial_placeholder.jpg",
+  OFFICE: "/images/salacomercial_placeholder.jpg",
+  LAND: null,
+  FARM: null,
+  GARAGE: null,
+  OTHER: null,
+};
