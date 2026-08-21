@@ -7,6 +7,7 @@ import type { Action } from "@/lib/rbac/actions";
 import { TenantContextStore, type TenantContext } from "@/lib/tenant/context";
 import { TenantResolver } from "@/lib/tenant/resolver";
 import { RequestContextStore, newRequestId } from "@/lib/http/request-context";
+import { logHttpRequest } from "@/lib/http/logger";
 import { fail } from "@/lib/http/errors";
 import { mapError } from "@/lib/http/errors";
 import type { AuthenticatedUser } from "@/types";
@@ -70,6 +71,27 @@ export function withApiRoute(
   ) => Promise<NextResponse>,
 ) {
   return async (req: NextRequest, route: HandlerArgs = {}): Promise<NextResponse> => {
+    const startedAt = performance.now();
+    const report = (
+      res: NextResponse,
+      userId: string | null,
+      tenantId: string | null,
+      requestId: string | null,
+      ipAddress: string | null,
+    ): NextResponse => {
+      logHttpRequest({
+        requestId,
+        ipAddress,
+        userId,
+        tenantId,
+        method: req.method,
+        path: req.nextUrl.pathname,
+        status: res.status,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+      return res;
+    };
+
     try {
       const session = await getSessionFromRequest(req);
 
@@ -127,10 +149,12 @@ export function withApiRoute(
       };
 
       return await TenantContextStore.run(tenantCtx, () =>
-        RequestContextStore.run(httpCtx, () => handler(routeCtx, req, params)),
+        RequestContextStore.run(httpCtx, async () =>
+          report(await handler(routeCtx, req, params), routeCtx.userId, routeCtx.tenantId, httpCtx.requestId, httpCtx.ipAddress),
+        ),
       );
     } catch (error) {
-      return mapError(error);
+      return report(mapError(error), null, null, null, null);
     }
   };
 }

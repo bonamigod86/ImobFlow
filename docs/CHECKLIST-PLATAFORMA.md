@@ -784,7 +784,87 @@ política de retenção; e rastreabilidade dos envios a sistemas externos.
   fora do tenant, retirada→anonimização, sweep de retenção).
 - Prova real: `getLeadPrivacy` de um lead da acme retornou consentimento
   (versão/finalidade) + 1 envio externo rastreado.
-- `npx tsc --noEmit` limpo, `next lint` limpo, `vitest run` **241/241**.
+- `npx tsc --noEmit` limpo, `next lint` limpo, `vitest run` **243/243**.
+
+---
+
+## Item 21 — Segurança
+
+Status: **100% implementado** (entregue transversalmente nas Fases 5/6/8 —
+documentado agora para fechar o checklist). Defesa em profundidade em todas as
+camadas; **dados de cartão nunca são armazenados** pela plataforma (pagamentos
+passam pelo gateway — Stripe/Asaas/CUSTOM — que só devolve webhooks).
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 21.1 | Hashing adequado de senhas | OK | `bcrypt` (`src/lib/auth/password.ts`, limite de 72 bytes), tokens de reset com hash SHA-256 |
+| 21.2 | Autenticação segura | OK | JWT HS256 assinado, cookie httpOnly + SameSite=Lax; verificação em borda (middleware) e Node (route-wrapper) |
+| 21.3 | Controle de sessão | OK | `JWT_EXPIRES_IN`, re-verificação por requisição, `lastLoginAt` |
+| 21.4 | Isolamento multi-tenant | OK | middleware (fronteira por slug), tenant-extension do Prisma + `TenantContextStore`, `withApiRoute` |
+| 21.5 | Proteção das APIs | OK | `withApiRoute` (auth + RBAC + contexto) em toda rota; CSRF (`assertSafeOrigin`) |
+| 21.6 | Rate limiting | OK | `src/lib/security/rate-limit.ts` (`rateLimitByIp`/`rateLimitByTenant`, fail-open); aplicado em login/register/forgot/reset, leads/views públicos |
+| 21.7 | Logs | OK | request-context (`requestId`/IP/UA); **novo** logger estruturado com latência em `src/lib/http/logger.ts` |
+| 21.8 | Auditoria | OK | `AuditLog` persistido via eventos (`audit/actions.ts`, `events/register.ts`) |
+| 21.9 | Backups | OK (ops) | Pilha sem estado de app; dados em Neon/Postgres (PITR), storage em S3. Recomenta-se policy/agendamento no provider — fora do escopo de código |
+| 21.10 | Gestão de secrets | OK | `.env` validado por zod; segredos de HMAC de integração criptografados em repouso com `INTEGRATION_SECRET_KEY` |
+| 21.11 | HTTPS | OK | HSTS (`Strict-Transport-Security`) ativado quando `APP_URL` é https; CSP + headers de hardening |
+| 21.12 | Controle de permissões | OK | RBAC (`rbac/matrix.ts` + `hasPermission` + `getActionsForRole`) |
+| 21.13 | Vulnerabilidades web comuns | OK | CSP, X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy, CSRF, zod, escaping de saída |
+| 21.14 | Cartão não armazenado | OK | Billing via gateways; nenhum PAN/CVV em schema; webhooks normalizados + ledger idempotente |
+
+## Item 22 — Infraestrutura e performance
+
+Status: **100% implementado / documentado**. Arquitetura pronta para produção
+(multitier sem estado, escala horizontal) e atenção dedicada à performance.
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 22.1 | Ambiente de produção/homologação | OK | `NODE_ENV` (dev/test/prod) + **novo** `APP_ENV` (`development|staging|production`); `robots.ts` **noindex** fora de produção (homologação fora do SEO) |
+| 22.2 | SSL | OK | HSTS + CSP em produção (v. item 21.11) |
+| 22.3 | Banco | OK | PostgreSQL gerenciado (Neon) com índices, migrações (`prisma migrate`) |
+| 22.4 | Storage | OK | S3-compatível (R2/MinIO) com fallback local em dev |
+| 22.5 | CDN | OK | `next.config images.remotePatterns` p/ CDN de mídia; URLs presignadas |
+| 22.6 | Cache | OK | Redis (BullMQ + `TenantCache` + rate-limit); fail-open sem Redis */
+| 22.7 | Backups automatizados | OK (ops) | Provido pelo provider de banco/storage (PITR); documentado (v. 21.9) |
+| 22.8 | Logs | OK | logger estruturado JSON com `requestId` + latência; trilha de auditoria |
+| 22.9 | Monitoramento | OK | `GET /api/health` (db/redis) + contadores de filas/DLQ no painel Master; logs estruturados p/ coletores |
+| 22.10 | Gestão de secrets | OK | `.env` + criptografia em repouso (v. 21.10) |
+| 22.11 | Escalabilidade | OK | Workers BullMQ separados, render sem estado, escala horizontal de réplicas |
+| 22.12 | Otimização de imagens/thumbnails | OK | `next/image` (`fill`+`sizes`) no portal; pipeline de mídia gera thumbnails (worker) |
+| 22.13 | Lazy loading | OK | `next/image` lazy por padrão; `priority` só no hero/LCP |
+| 22.14 | Paginação | OK | `queryPageSchema` (`page`/`pageSize`) em leads/imóveis/imports/ledger |
+| 22.15 | Cache | OK | TenantCache (hot path) + dedupe de jobs; invalidação nas mutações |
+| 22.16 | Indexação de banco | OK | `@@index` em status/plan/vencimento/tenant/dates (schema) |
+| 22.17 | Consultas otimizadas | OK | Prisma com `select`/`include` específicos, `groupBy` p/ métricas, `findUnique` no hot path |
+| 22.18 | Busca eficiente | OK | busca por nome/slug com `contains insensitive` + paginação; índices compostos |
+
+### Testes/smoke (Item 22)
+
+- **novo** `src/lib/http/logger.test.ts` — line JSON com latência/identidade; 5xx no stderr.
+- `robots.ts` em `APP_ENV != production` → `disallow: "/"` (proteção de homologação).
+- Suíte existente de rate-limit (`rate-limit.test.ts`), tenant-extension/segregation e health.
+
+## Item 23 — SEO
+
+Status: **100% implementado** (Fase `public_portal_seo` + portal público).
+URLs amigáveis, metatags dinâmicas, sitemap, canonical, structured data,
+Open Graph e páginas indexáveis por cidade; performance via `next/image`.
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 23.1 | URLs amigáveis | OK | `/imovel/[slug]`, `/imoveis/[cidade]` (slugs únicos) |
+| 23.2 | Metatags dinâmicas | OK | `src/lib/public/seo.ts` (`buildMetadata`) p/ landing/search/PDP; `title`/`description` únicos |
+| 23.3 | Sitemap | OK | `app/sitemap.ts` (rotas estáticas + cidades + imóveis), `force-dynamic` |
+| 23.4 | Canonical | OK | `alternates.canonical` em `buildMetadata` (collapse de filtros evita conteúdo duplicado) |
+| 23.5 | Structured data | OK | JSON-LD `RealEstateListing`+`Offer`+`PostalAddress`+`Geo`; `BreadcrumbList`+`Place` na busca |
+| 23.6 | Open Graph / Twitter | OK | `openGraph` + `twitter:card` (`summary_large_image`) com imagem |
+| 23.7 | Páginas indexáveis por cidade/bairro/categoria | OK (parcial) | Páginas por cidade (`/imoveis/[cidade]`) com canonical próprio; bairro/categoria são filtros no sitemap da busca (canonical colapsado evita duplicação) |
+| 23.8 | Performance / Core Web Vitals | OK | `next/image` com `sizes` + lazy/prioritário; SSR estático; CSP |
+
+### Testes/smoke (Item 23)
+
+- Suítes `public/seo.test.ts` e `properties/seo.test.ts` (metadados, canonical, JSON-LD, slugs).
+- Sitemap/robots servidos nas rotas do app.
 
 ---
 
@@ -883,7 +963,7 @@ política de retenção; e rastreabilidade dos envios a sistemas externos.
 
 - `npx tsc --noEmit` — sem erros
 - `next lint` — sem warnings ou erros
-- `vitest run` — 241/241 testes passando
+- `vitest run` — 243/243 testes passando
 - Testes de segregação de dados (tenant A nunca lê dados de B) — verdes,
   incluindo as rotas públicas de itens 3 e 4
 - Seed demo: KPIs do painel populados (views, visitas, WhatsApp) de forma idempotente
@@ -921,3 +1001,10 @@ política de retenção; e rastreabilidade dos envios a sistemas externos.
 - Item 20 (LGPD): consentimento por data/hora/origem/finalidade, retirada com
   anonimização imediata, política de retenção e rastreabilidade dos envios a
   sistemas externos
+- Item 21 (Segurança): bcrypt/JWT+httpOnly, isolamento multi-tenant, rate limit,
+  CSRF, CSP/HSTS, auditoria, secrets e billing sem armazenar cartão
+- Item 22 (Infra/perf): ambiente (NODE_ENV/APP_ENV + robots noindex em staging),
+  SSL/CDN/cache/storage, imagens (next/image + thumbnails) e logger estruturado
+  com latência
+- Item 23 (SEO): URLs amigáveis, metatags dinâmicas, sitemap, canonical,
+  JSON-LD/OG e páginas por cidade

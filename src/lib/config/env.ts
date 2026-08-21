@@ -14,6 +14,12 @@ const envSchema = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
 
+  /** Deployment ring — `production` vs `staging`/`development` (homologação). */
+  APP_ENV: z
+    .enum(["development", "staging", "production"])
+    .optional()
+    .transform((v) => v ?? (process.env.NODE_ENV === "production" ? "production" : "development")),
+
   DATABASE_URL: z
     .string()
     .min(1, "DATABASE_URL is required")
