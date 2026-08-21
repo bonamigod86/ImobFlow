@@ -21,10 +21,10 @@ export function SiteHeader() {
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 md:flex">
-          <Link href="/imoveis/venda" className="transition-colors hover:text-navy-700">
+          <Link href="/imoveis/venda" className="transition-colors hover:text-emerald-600">
             Comprar
           </Link>
-          <Link href="/imoveis/aluguel" className="transition-colors hover:text-navy-700">
+          <Link href="/imoveis/aluguel" className="transition-colors hover:text-emerald-600">
             Alugar
           </Link>
         </nav>

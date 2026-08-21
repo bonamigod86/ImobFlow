@@ -107,8 +107,8 @@ function LeadsCard({ snapshot }: { snapshot: DashboardSnapshot }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-100">
-            <Users className="h-4 w-4 text-sky-700" />
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-100">
+            <Users className="h-4 w-4 text-teal-700" />
           </span>
           Leads do mês
         </CardTitle>

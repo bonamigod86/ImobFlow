@@ -265,7 +265,8 @@ function MediaTile({
         )}
         <Button
           size="sm"
-          className="whitespace-nowrap bg-red-600 px-2.5 text-xs text-white hover:bg-red-700"
+          variant="destructive"
+          className="whitespace-nowrap px-2.5 text-xs"
           onClick={onRemove}
         >
           <Trash2 className="h-3.5 w-3.5" />

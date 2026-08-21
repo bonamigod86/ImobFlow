@@ -45,13 +45,13 @@ export function HeroSearchForm({ cities = [] }: { cities?: HeroCity[] }) {
       className="mx-auto mt-8 grid max-w-5xl grid-cols-1 items-stretch gap-2.5 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xl shadow-slate-200/70 md:grid-cols-12"
     >
       <label className="relative md:col-start-1 md:col-span-12 md:row-start-1">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-400" />
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-500" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Bairro, código ou palavras-chave…"
           aria-label="Buscar imóveis"
-          className="w-full rounded-xl border border-navy-100 bg-slate-50 py-3 pl-10 pr-3 text-center text-sm text-slate-800 outline-none placeholder:text-slate-500 transition-colors focus:border-navy-400 focus:bg-white focus:ring-2 focus:ring-navy-100"
+          className="w-full rounded-xl border border-emerald-100 bg-slate-50 py-3 pl-10 pr-3 text-center text-sm text-slate-800 outline-none placeholder:text-slate-500 transition-colors focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-100"
         />
       </label>
 
@@ -59,7 +59,7 @@ export function HeroSearchForm({ cities = [] }: { cities?: HeroCity[] }) {
         value={city}
         onChange={(e) => setCity(e.target.value)}
         aria-label="Cidade"
-        className="md:col-start-1 md:col-span-4 md:row-start-2 rounded-xl border border-navy-100 bg-white px-3 py-3 text-center text-sm text-slate-800 outline-none transition-colors focus:border-navy-400 focus:ring-2 focus:ring-navy-100"
+        className="md:col-start-1 md:col-span-4 md:row-start-2 rounded-xl border border-emerald-100 bg-white px-3 py-3 text-center text-sm text-slate-800 outline-none transition-colors focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
       >
         <option value="">Todas as cidades</option>
         {cities.map((c) => (
@@ -74,7 +74,7 @@ export function HeroSearchForm({ cities = [] }: { cities?: HeroCity[] }) {
         value={target}
         onChange={(e) => setTarget(e.target.value as "" | Target)}
         aria-label="Finalidade"
-        className="md:col-start-5 md:col-span-4 md:row-start-2 rounded-xl border border-navy-100 bg-white px-3 py-3 text-center text-sm text-slate-800 outline-none transition-colors focus:border-navy-400 focus:ring-2 focus:ring-navy-100"
+        className="md:col-start-5 md:col-span-4 md:row-start-2 rounded-xl border border-emerald-100 bg-white px-3 py-3 text-center text-sm text-slate-800 outline-none transition-colors focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
       >
         <option value="">Venda ou aluguel</option>
         <option value="SALE">Venda</option>
@@ -85,7 +85,7 @@ export function HeroSearchForm({ cities = [] }: { cities?: HeroCity[] }) {
         value={category}
         onChange={(e) => setCategory(e.target.value as "" | Category)}
         aria-label="Categoria"
-        className="md:col-start-9 md:col-span-4 md:row-start-2 rounded-xl border border-navy-100 bg-white px-3 py-3 text-center text-sm text-slate-800 outline-none transition-colors focus:border-navy-400 focus:ring-2 focus:ring-navy-100"
+        className="md:col-start-9 md:col-span-4 md:row-start-2 rounded-xl border border-emerald-100 bg-white px-3 py-3 text-center text-sm text-slate-800 outline-none transition-colors focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
       >
         <option value="">Todas as categorias</option>
         {(Object.keys(CATEGORY_SLUGS) as Category[]).map((cat) => (

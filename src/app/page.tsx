@@ -49,7 +49,7 @@ export default async function LandingPage() {
 
             <Link
               href="/imoveis"
-              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-navy-700 transition-colors hover:text-navy-900"
+              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-emerald-600 transition-colors hover:text-emerald-700"
             >
               Explorar todos os imóveis
               <ArrowRight className="h-4 w-4" />
@@ -67,9 +67,9 @@ export default async function LandingPage() {
               <Link
                 key={l.label}
                 href={l.href}
-                className="group flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-navy-200 hover:bg-navy-50 hover:shadow"
+                className="group flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50 hover:shadow"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-navy-50 text-navy-700 transition-colors group-hover:bg-navy-100">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 transition-colors group-hover:bg-emerald-100">
                   <l.icon className="h-5 w-5" />
                 </span>
                 {l.label}
@@ -85,10 +85,10 @@ export default async function LandingPage() {
         <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
           <div className="mb-6 flex items-end justify-between">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-navy-900">Imóveis em destaque</h2>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">Imóveis em destaque</h2>
               <p className="mt-1 text-sm text-slate-500">Selecionados pelas imobiliárias parceiras.</p>
             </div>
-            <Link href="/imoveis?featured=true" className="inline-flex items-center gap-1 text-sm font-semibold text-navy-700 hover:text-navy-900">
+            <Link href="/imoveis?featured=true" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 hover:text-emerald-700">
               Ver todos <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -104,7 +104,7 @@ export default async function LandingPage() {
       {cities.length > 0 && (
         <section className="border-y border-slate-200 bg-white">
           <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-            <h2 className="mb-6 text-2xl font-bold tracking-tight text-navy-900">Explore por cidade</h2>
+            <h2 className="mb-6 text-2xl font-bold tracking-tight text-slate-900">Explore por cidade</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {cities.map((c) => (
                 <Link
@@ -113,7 +113,7 @@ export default async function LandingPage() {
                   className="group flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 transition-colors hover:border-brand-300 hover:bg-brand-50"
                 >
                   <div>
-                    <span className="font-semibold text-slate-800 group-hover:text-navy-700">{c.city}</span>
+                    <span className="font-semibold text-slate-800 group-hover:text-emerald-700">{c.city}</span>
                     <span className="ml-2 text-sm text-slate-500">· {c.state}</span>
                   </div>
                   <span className="text-sm text-slate-400">{c.listingCount} imóveis</span>
@@ -129,10 +129,10 @@ export default async function LandingPage() {
         <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
           <div className="mb-6 flex items-end justify-between">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-navy-900">Recém-chegados</h2>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">Recém-chegados</h2>
               <p className="mt-1 text-sm text-slate-500">Os últimos imóveis publicados no portal.</p>
             </div>
-            <Link href="/imoveis?sort=newest" className="inline-flex items-center gap-1 text-sm font-semibold text-navy-700 hover:text-navy-900">
+            <Link href="/imoveis?sort=newest" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 hover:text-emerald-700">
               Ver todos <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -154,8 +154,8 @@ export default async function LandingPage() {
               { icon: Zap, title: "Agende sua visita", desc: "Envie sua solicitação e receba o retorno rapidamente." },
             ].map((f) => (
               <div key={f.title} className="text-center sm:text-left">
-                <f.icon className="mx-auto h-8 w-8 text-navy-700 sm:mx-0" />
-                <h3 className="mt-3 font-semibold text-navy-900">{f.title}</h3>
+                <f.icon className="mx-auto h-8 w-8 text-emerald-600 sm:mx-0" />
+                <h3 className="mt-3 font-semibold text-slate-900">{f.title}</h3>
                 <p className="mt-1 text-sm text-slate-500">{f.desc}</p>
               </div>
             ))}
