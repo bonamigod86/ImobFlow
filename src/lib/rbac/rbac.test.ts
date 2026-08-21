@@ -35,6 +35,7 @@ describe("RBAC permission matrix", () => {
     expect(hasPermission(principal("OWNER"), ACTIONS.BILLING_ADMIN)).toBe(false);
     expect(hasPermission(principal("MANAGER"), ACTIONS.BILLING_ADMIN)).toBe(false);
     expect(hasPermission(principal("AGENT"), ACTIONS.BILLING_ADMIN)).toBe(false);
+    expect(hasPermission(principal("RECEPTIONIST"), ACTIONS.BILLING_ADMIN)).toBe(false);
     expect(hasPermission(principal("OWNER"), ACTIONS.BILLING_SELF)).toBe(true);
     expect(hasPermission(principal("MANAGER"), ACTIONS.BILLING_SELF)).toBe(true);
     expect(hasPermission(principal("AGENT"), ACTIONS.BILLING_SELF)).toBe(false);

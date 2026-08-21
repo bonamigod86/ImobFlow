@@ -7,8 +7,9 @@ import { ok, fail } from "@/lib/http/errors";
 
 /**
  * GET /api/admin/dlq?queueName=<queue>
- * List parked (dead-lettered) jobs for the given queue. Tenants only ever see
- * their own payloads; MASTER sees everything.
+ * List parked (dead-lettered) jobs for the given queue. MASTER-only — sits in
+ * the `/admin` namespace and must never be reachable by a tenant subscriber
+ * (`billing:admin` is the platform RBAC gate).
  */
 
 const QUEUES: Record<string, QueueNameType> = {
@@ -18,7 +19,7 @@ const QUEUES: Record<string, QueueNameType> = {
   [QueueName.PROPERTY_IMPORT]: QueueName.PROPERTY_IMPORT,
 };
 
-export const GET = withApiRoute(ACTIONS.INTEGRATIONS_MANAGE, async (ctx, req) => {
+export const GET = withApiRoute(ACTIONS.BILLING_ADMIN, async (ctx, req) => {
   const queueName = new URL(req.url).searchParams.get("queueName") ?? "";
   const queue = QUEUES[queueName];
   if (!queue) {
