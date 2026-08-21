@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BadgeCheck,
   CalendarCheck,
@@ -13,6 +13,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  Search,
   Star,
   StarOff,
   Trash2,
@@ -30,6 +31,7 @@ import {
 import { PropertyThumb } from "@/components/dashboard/PropertyThumb";
 import { PropertyDialogs, type PropertyAction } from "@/components/dashboard/PropertyDialogs";
 import type { PropertyRow } from "@/components/dashboard/types";
+import { CATEGORY_LABELS } from "@/lib/public/types";
 import {
   STATUS_LABELS,
   STATUS_BADGE_VARIANTS,
@@ -74,6 +76,22 @@ export function PropertyManager({
   const [action, setAction] = useState<PropertyAction | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((property) => {
+      if (needle) {
+        const hay = `${property.title} ${property.code}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      if (statusFilter && property.status !== statusFilter) return false;
+      if (categoryFilter && property.category !== categoryFilter) return false;
+      return true;
+    });
+  }, [rows, q, statusFilter, categoryFilter]);
 
   async function runLifecycle(property: PropertyRow, request: () => Promise<Response>, failMessage: string) {
     setActionError(null);
@@ -149,6 +167,40 @@ export function PropertyManager({
         <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>
       )}
 
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar por título ou código…"
+            className="h-9 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="Situação"
+          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+        >
+          <option value="">Toda situação</option>
+          {(Object.keys(STATUS_LABELS) as Array<keyof typeof STATUS_LABELS>).map((s) => (
+            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+          ))}
+        </select>
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          aria-label="Categoria"
+          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+        >
+          <option value="">Toda categoria</option>
+          {(Object.keys(CATEGORY_LABELS) as Array<keyof typeof CATEGORY_LABELS>).map((c) => (
+            <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+          ))}
+        </select>
+      </div>
+
       {rows.length === 0 && !loading ? (
         <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center">
           <p className="text-sm text-slate-500">Nenhum imóvel cadastrado ainda.</p>
@@ -165,9 +217,13 @@ export function PropertyManager({
             <Skeleton key={i} className="h-64" />
           ))}
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center">
+          <p className="text-sm text-slate-500">Nenhum imóvel corresponde aos filtros atuais.</p>
+        </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {rows.map((property) => {
+          {filtered.map((property) => {
             const price = priceForRow(property);
             const actions = lifecycle(property);
             const busy = busyId === property.id;

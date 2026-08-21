@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, ChevronDown, ExternalLink, Landmark, MessageCircle, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CalendarClock, ChevronDown, ExternalLink, Landmark, MessageCircle, Search, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -151,9 +152,25 @@ export default function LeadsTable({
   const [total, setTotal] = useState(0);
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState<LeadItem | null>(null);
+  const [q, setQ] = useState("");
+  const [solicitation, setSolicitation] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const pageSize = limit ?? 50;
   const onlyFirstPage = limit !== undefined;
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return items.filter((lead) => {
+      if (needle) {
+        const hay = `${lead.name} ${lead.email ?? ""}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      if (solicitation && solicitationType(lead).label !== solicitation) return false;
+      if (statusFilter && lead.status !== statusFilter) return false;
+      return true;
+    });
+  }, [items, q, solicitation, statusFilter]);
 
   const load = useCallback(
     async (pageNumber: number) => {
@@ -196,15 +213,51 @@ export default function LeadsTable({
       {showHeader && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight text-ink-50">Leads recebidos</h2>
-            <p className="text-sm text-ink-400">
+            <h2 className="text-lg font-bold tracking-tight text-slate-900">Leads recebidos</h2>
+            <p className="text-xs font-medium text-slate-500">
               {total} lead{total === 1 ? "" : "s"} · Dados isolados por tenant.
             </p>
           </div>
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-ink-800">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/80 bg-white p-3">
+        <div className="relative min-w-[12rem] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar por nome ou e-mail…"
+            className="pl-9"
+          />
+        </div>
+        <select
+          value={solicitation}
+          onChange={(e) => setSolicitation(e.target.value)}
+          aria-label="Tipo de solicitação"
+          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+        >
+          <option value="">Toda solicitação</option>
+          <option>Agendamento de Visita</option>
+          <option>Simulação Financeira</option>
+          <option>Contato Direto</option>
+          <option>Dúvida</option>
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="Situação"
+          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+        >
+          <option value="">Toda situação</option>
+          <option value="NEW">Novo</option>
+          <option value="CONTACTED">Em atendimento</option>
+          <option value="WON">Concluído</option>
+          <option value="LOST">Arquivado</option>
+        </select>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-slate-200">
         <Table>
           <TableHeader>
             <TableRow>
@@ -217,20 +270,20 @@ export default function LeadsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {busy && items.length === 0 ? (
+            {busy && filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-sm text-ink-400">
+                <TableCell colSpan={6} className="h-24 text-center text-sm text-slate-400">
                   Carregando leads…
                 </TableCell>
               </TableRow>
-            ) : items.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-sm text-ink-400">
+                <TableCell colSpan={6} className="h-24 text-center text-sm text-slate-400">
                   Nenhum lead capturado ainda.
                 </TableCell>
               </TableRow>
             ) : (
-              items.map((lead) => (
+              filtered.map((lead) => (
                 <LeadRow key={lead.id} lead={lead} onStatus={changeStatus} onDetail={() => setDetail(lead)} />
               ))
             )}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Images, Loader2, Plus, Save } from "lucide-react";
+import { ArrowRight, Images, Loader2, Plus, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -476,6 +476,25 @@ export function FormDialog({
           </div>
         </div>
 
+        {editing && (
+          <button
+            type="button"
+            onClick={() => setMediaFor({ id: editing.id, title: editing.title })}
+            className="flex w-full items-center gap-3 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-left transition-colors hover:border-emerald-400 hover:bg-emerald-50"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+              <Images className="h-5 w-5" />
+            </span>
+            <span className="flex-1">
+              <span className="block text-sm font-semibold text-slate-900">Fotos do imóvel</span>
+              <span className="block text-xs text-slate-500">
+                Enviar imagem principal (capa) e as demais fotos da galeria
+              </span>
+            </span>
+            <ArrowRight className="h-4 w-4 text-slate-400" />
+          </button>
+        )}
+
         {error && (
           <p className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
             {error}
@@ -483,17 +502,6 @@ export function FormDialog({
         )}
 
         <DialogFooter className="gap-2">
-          {editing && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="mr-auto"
-              onClick={() => setMediaFor({ id: editing.id, title: editing.title })}
-            >
-              <Images className="h-4 w-4" />
-              Fotos do imóvel
-            </Button>
-          )}
           <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>
             Cancelar
           </Button>
