@@ -27,9 +27,6 @@ export function SiteHeader() {
           <Link href="/imoveis/aluguel" className="transition-colors hover:text-brand-600">
             Alugar
           </Link>
-          <Link href="/imoveis/casa" className="transition-colors hover:text-brand-600">
-            Casas
-          </Link>
         </nav>
 
         <div className="flex items-center gap-2">

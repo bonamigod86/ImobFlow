@@ -136,7 +136,7 @@ export default async function SearchPage({ params, searchParams }: PageProps) {
           <p className="mt-1 text-sm text-slate-500">
             {result.total > 0 ? (
               <>
-                {result.total} imóvel{result.total === 1 ? "" : "is"} encontrado{result.total === 1 ? "" : "s"}
+                {result.total} {result.total === 1 ? "imóvel encontrado" : "imóveis encontrados"}
                 {hasActiveFilter ? " com os filtros aplicados" : ""}.
               </>
             ) : (
