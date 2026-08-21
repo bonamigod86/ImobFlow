@@ -49,7 +49,7 @@ export default async function LandingPage() {
 
             <Link
               href="/imoveis"
-              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand-600 transition-colors hover:text-brand-700"
+              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-navy-700 transition-colors hover:text-navy-900"
             >
               Explorar todos os imóveis
               <ArrowRight className="h-4 w-4" />
@@ -67,9 +67,9 @@ export default async function LandingPage() {
               <Link
                 key={l.label}
                 href={l.href}
-                className="group flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow"
+                className="group flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-navy-200 hover:bg-navy-50 hover:shadow"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-100">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-navy-50 text-navy-700 transition-colors group-hover:bg-navy-100">
                   <l.icon className="h-5 w-5" />
                 </span>
                 {l.label}
@@ -88,7 +88,7 @@ export default async function LandingPage() {
               <h2 className="text-2xl font-bold tracking-tight text-navy-900">Imóveis em destaque</h2>
               <p className="mt-1 text-sm text-slate-500">Selecionados pelas imobiliárias parceiras.</p>
             </div>
-            <Link href="/imoveis?featured=true" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">
+            <Link href="/imoveis?featured=true" className="inline-flex items-center gap-1 text-sm font-semibold text-navy-700 hover:text-navy-900">
               Ver todos <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -113,7 +113,7 @@ export default async function LandingPage() {
                   className="group flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 transition-colors hover:border-brand-300 hover:bg-brand-50"
                 >
                   <div>
-                    <span className="font-semibold text-slate-800 group-hover:text-brand-700">{c.city}</span>
+                    <span className="font-semibold text-slate-800 group-hover:text-navy-700">{c.city}</span>
                     <span className="ml-2 text-sm text-slate-500">· {c.state}</span>
                   </div>
                   <span className="text-sm text-slate-400">{c.listingCount} imóveis</span>
@@ -132,7 +132,7 @@ export default async function LandingPage() {
               <h2 className="text-2xl font-bold tracking-tight text-navy-900">Recém-chegados</h2>
               <p className="mt-1 text-sm text-slate-500">Os últimos imóveis publicados no portal.</p>
             </div>
-            <Link href="/imoveis?sort=newest" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">
+            <Link href="/imoveis?sort=newest" className="inline-flex items-center gap-1 text-sm font-semibold text-navy-700 hover:text-navy-900">
               Ver todos <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -154,8 +154,8 @@ export default async function LandingPage() {
               { icon: Zap, title: "Agende sua visita", desc: "Envie sua solicitação e receba o retorno rapidamente." },
             ].map((f) => (
               <div key={f.title} className="text-center sm:text-left">
-                <f.icon className="mx-auto h-8 w-8 text-brand-600 sm:mx-0" />
-                <h3 className="mt-3 font-semibold text-slate-900">{f.title}</h3>
+                <f.icon className="mx-auto h-8 w-8 text-navy-700 sm:mx-0" />
+                <h3 className="mt-3 font-semibold text-navy-900">{f.title}</h3>
                 <p className="mt-1 text-sm text-slate-500">{f.desc}</p>
               </div>
             ))}
