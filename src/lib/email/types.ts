@@ -7,16 +7,19 @@
  * not inside a rendered e-mail.
  */
 
-/** The eleven supported transactional messages. */
+/** The fourteen supported transactional messages. */
 export type EmailEvent =
   | "welcome"
   | "account_activation"
   | "password_reset"
   | "subscription_created"
   | "invoice_paid"
+  | "invoice_due_soon"
   | "invoice_past_due"
+  | "last_warning"
   | "final_lockout_warning"
   | "account_reactivated"
+  | "subscription_cancelled"
   | "new_lead_alert"
   | "visit_request"
   | "payment_link";
@@ -62,7 +65,24 @@ export interface EmailPayloadMap {
     paidAt: string;
     appUrl: string;
   };
+  invoice_due_soon: {
+    recipientName: string;
+    tenantName: string;
+    planName: string;
+    amountBRL: string;
+    dueDate: string;
+    appUrl: string;
+  };
   invoice_past_due: {
+    recipientName: string;
+    tenantName: string;
+    planName: string;
+    amountBRL: string;
+    dueDate: string;
+    graceEndsAt: string | null;
+    appUrl: string;
+  };
+  last_warning: {
     recipientName: string;
     tenantName: string;
     planName: string;
@@ -76,6 +96,13 @@ export interface EmailPayloadMap {
     tenantName: string;
     reason: string;
     blockedAt: string;
+    appUrl: string;
+  };
+  subscription_cancelled: {
+    recipientName: string;
+    tenantName: string;
+    planName: string;
+    cancelledAt: string;
     appUrl: string;
   };
   account_reactivated: {

@@ -612,6 +612,63 @@ do dev server):
 
 ---
 
+## Item 15 — E-mails transacionais
+
+Status: **100% implementado**. Camada de e-mail transacional profissional com
+transports reais (Resend/SendGrid/SES/console), fila própria (`EMAIL_SEND`) com
+dedupe e **templates com variáveis e administração simples** — o MASTER edita
+assunto/corpo com placeholders `{{variável}}` sem redeploy; campos vazios usam o
+modelo padrão embutido.
+
+| # | Cenário | Evento (`EmailEvent`) | Gatilho / Implementação |
+|---|---------|-----------------------|--------------------------|
+| 15.1 | Boas-vindas | `welcome` | `user.created` → `register-mail.ts` → `notifyWelcomeAccount` |
+| 15.2 | Confirmação de cadastro | `account_activation` | `user.activated` → `notifyAccountActivation` |
+| 15.3 | Recuperação de senha | `password_reset` | `POST /api/auth/forgot-password` → `notifyPasswordReset` (link + expiração) |
+| 15.4 | Criação de assinatura | `subscription_created` | `billing.subscription.provisioned` → `notifySubscriptionCreated` |
+| 15.5 | Pagamento aprovado | `invoice_paid` | `billing.invoice.paid` → `notifyInvoicePaid` |
+| 15.6 | Próximo vencimento | `invoice_due_soon` | `billing.dunning.notified` com kind `PRE_DUE`/`DUE_REMINDER` → `notifyNextDue` (**novo**) |
+| 15.7 | Pagamento vencido | `invoice_past_due` | dunning `PAYMENT_FAILED` → `notifyInvoicePastDue` |
+| 15.8 | Último aviso | `last_warning` | dunning `LATE_REMINDER` → `notifyLastWarning` (**novo**) |
+| 15.9 | Bloqueio | `final_lockout_warning` | `billing.subscription.blocked` → `notifyFinalLockout` |
+| 15.10 | Reativação | `account_reactivated` | `billing.subscription.reactivated` → `notifyAccountReactivated` |
+| 15.11 | Cancelamento | `subscription_cancelled` | `billing.subscription.cancelled` → `notifySubscriptionCancelled` (**novo**) |
+| 15.12 | Novo lead | `new_lead_alert` | captura no `lead-service` → `notifyNewLeadAlert` |
+| 15.13 | Pedido de visita | `visit_request` | captura com `schedule` → `notifyVisitRequest` |
+| 15.14 | Templates com variáveis + admin | `EmailTemplate` | Modelo novo (migração `20260820090000_email_templates`); `renderEmail` substitui `{{var}}`; `GET/PUT /api/admin/email-templates` e console `/admin/email-templates` | 
+
+### Transportes e entrega
+
+- `EMAIL_PROVIDER` = `resend` | `sendgrid` | `ses` | `console` (env); transports
+  por `fetch` puro em `src/lib/email/transports.ts`, com retry (429/5xx → BullMQ)
+  e DLQ para erro permanente.
+- Filas: `QueueManager.addEmailSend` → worker `email.worker` (dedupe por
+  `event:to:payload`); falha ao enfileirar é logada e nunca quebra a mutação.
+- Renderer em `src/lib/email/templates.ts`: layout table/Outlook-friendly,
+  dark-mode, texto alternativo e escape XSS em todo valor dinâmico.
+
+### Administração simples de templates
+
+1. `GET /api/admin/email-templates` (MASTER) — lista os 14 eventos com rótulo,
+   estado (Padrão/Personalizado/Desativado) e data da última edição.
+2. `PUT /api/admin/email-templates/[event]` (MASTER) — upsert de
+   `subject`/`htmlBody`/`textBody` com `{{variável}}`; campo vazio restaura o
+   modelo embutido; `enabled=false` restaura tudo.
+3. Console `/admin/email-templates` — tabela editável com dica das variáveis
+   por evento e preview do estado.
+
+### Testes/smoke realizados (Item 15)
+
+1. Suíte `templates.test.ts` cobre os 14 eventos (subject/html/text), escape XSS
+   de valores dinâmicos, dedupe estável e **4 testes novos** de substituição de
+   `{{var}}` em subject/corpo (com escape no HTML e fallback ao padrão).
+2. Prova em processo fresco (base real): `EmailTemplate` upsert para
+   `invoice_due_soon` + `renderEmail` substituiu `{{amountBRL}}`/`{{dueDate}}`/
+   `{{recipientName}}` no assunto e corpo; registro de teste removido ao final.
+3. `npx tsc --noEmit` limpo, `next lint` limpo, `vitest run` **227/227**.
+
+---
+
 ## Correções aplicadas após a auditoria (Item 5)
 
 1. **Duplicar conflitava no `externalCode`** — `duplicateProperty` copiava o
@@ -707,7 +764,7 @@ do dev server):
 
 - `npx tsc --noEmit` — sem erros
 - `next lint` — sem warnings ou erros
-- `vitest run` — 220/220 testes passando
+- `vitest run` — 227/227 testes passando
 - Testes de segregação de dados (tenant A nunca lê dados de B) — verdes,
   incluindo as rotas públicas de itens 3 e 4
 - Seed demo: KPIs do painel populados (views, visitas, WhatsApp) de forma idempotente
@@ -730,3 +787,7 @@ do dev server):
   automática, auto-collect, trial→pendente→vencida→bloqueada, lembretes no
   vencimento/em atraso e o bloqueio manual impenetrável a webhook validados com
   o pipeline real (ledger + state machine)
+- Item 15 (e-mails transacionais): 14 cenários cobertos (boas-vindas, ativação,
+  senha, assinatura, pagamento, vencimento próximo, atraso, último aviso,
+  bloqueio, reativação, cancelamento, lead, visita) com transports
+  resend/sendgrid/ses/console e templates administráveis com `{{variáveis}}

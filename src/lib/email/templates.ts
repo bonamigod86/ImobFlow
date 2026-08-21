@@ -293,6 +293,62 @@ const renderers: {
     appUrl: p.appUrl,
   }),
 
+  invoice_due_soon: (p) => ({
+    subject: `Seu próximo vencimento — ${p.amountBRL}`,
+    preheader: `A fatura de ${p.planName} vence em ${formatDateBr(p.dueDate)}.`,
+    html: `
+      <h1 style="margin:0 0 16px;font-size:22px;color:#111827">Próximo vencimento</h1>
+      <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6">
+        Olá, ${escapeHtml(p.recipientName)}. A fatura de <strong>${escapeHtml(p.amountBRL)}</strong> do plano
+        <strong>${escapeHtml(p.planName)}</strong> de <strong>${escapeHtml(p.tenantName)}</strong> vence em
+        <strong>${formatDateBr(p.dueDate)}</strong>.
+      </p>
+      <p style="margin:0 0 20px">${link(`${p.appUrl}/dashboard/billing`, "Ver minha fatura")}</p>
+      <p style="margin:0;font-size:13px;color:#6b7280">Pague antes do vencimento para manter a conta sempre ativa.</p>
+    `,
+    text: `Próximo vencimento\n\nOlá, ${p.recipientName}.\nA fatura de ${p.amountBRL} do plano ${p.planName} (${p.tenantName}) vence em ${formatDateBr(p.dueDate)}.\nVer fatura: ${p.appUrl}/dashboard/billing`,
+    appUrl: p.appUrl,
+  }),
+
+  last_warning: (p) => ({
+    subject: "Último aviso antes da suspensão",
+    preheader: "Regularize agora ou sua conta será suspensa em breve.",
+    html: `
+      <h1 style="margin:0 0 16px;font-size:22px;color:#b91c1c">Último aviso</h1>
+      <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6">
+        Olá, ${escapeHtml(p.recipientName)}. A fatura de <strong>${escapeHtml(p.amountBRL)}</strong> do plano
+        <strong>${escapeHtml(p.planName)}</strong> (${escapeHtml(p.tenantName)}), vencida em
+        <strong>${formatDateBr(p.dueDate)}</strong>, segue em aberto.
+      </p>
+      ${p.graceEndsAt
+        ? `<p style="margin:0 0 16px;font-size:15px;color:#b91c1c;font-weight:600">Este é o último aviso: sem o pagamento, a conta será suspensa em <strong>${formatDateTimeBr(p.graceEndsAt)}</strong>.</p>`
+        : `<p style="margin:0 0 16px;font-size:15px;color:#b91c1c;font-weight:600">Este é o último aviso antes da suspensão da conta.</p>`}
+      <p style="margin:0 0 20px">${link(`${p.appUrl}/dashboard/billing`, "Regularizar agora")}</p>
+      <p style="margin:0;font-size:13px;color:#6b7280">Seus dados nunca são apagados. O pagamento reativa a conta automaticamente.</p>
+    `,
+    text: `Último aviso — ${p.tenantName}\n\nA fatura de ${p.amountBRL} (plano ${p.planName}) vencida em ${formatDateBr(p.dueDate)} segue em aberto.${p.graceEndsAt ? `\nSuspensão automática em ${formatDateTimeBr(p.graceEndsAt)}.` : ""}\nRegularize: ${p.appUrl}/dashboard/billing`,
+    appUrl: p.appUrl,
+  }),
+
+  subscription_cancelled: (p) => ({
+    subject: "Assinatura cancelada",
+    preheader: `O plano ${p.planName} de ${p.tenantName} foi cancelado.`,
+    html: `
+      <h1 style="margin:0 0 16px;font-size:22px;color:#111827">Assinatura cancelada</h1>
+      <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6">
+        Olá, ${escapeHtml(p.recipientName)}. A assinatura do plano <strong>${escapeHtml(p.planName)}</strong> da
+        organização <strong>${escapeHtml(p.tenantName)}</strong> foi cancelada em <strong>${formatDateTimeBr(p.cancelledAt)}</strong>.
+      </p>
+      <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6">
+        Seus dados e imóveis foram preservados. Você pode reassinar um plano a qualquer momento.
+      </p>
+      <p style="margin:0 0 20px">${link(`${p.appUrl}/dashboard/billing`, "Ver planos")}</p>
+      <p style="margin:0;font-size:13px;color:#6b7280">Caso este cancelamento não tenha sido solicitado, fale com o suporte da sua conta.</p>
+    `,
+    text: `Assinatura cancelada\n\nOlá, ${p.recipientName}.\nO plano ${p.planName} de ${p.tenantName} foi cancelado em ${formatDateTimeBr(p.cancelledAt)}.\nSeus dados foram preservados. Ver planos: ${p.appUrl}/dashboard/billing`,
+    appUrl: p.appUrl,
+  }),
+
   payment_link: (p) => ({
     subject: `Link de pagamento — fatura de ${p.amountBRL}`,
     preheader: `Pague sua fatura em atraso pelo link seguro abaixo.`,
@@ -311,9 +367,44 @@ const renderers: {
   }),
 };
 
-/** Render a typed message into a provider-agnostic outbound envelope. */
-export function renderEmail(message: EmailMessage): OutboundEmail {
+/**
+ * Substitute `{{variável}}` placeholders from an e-mail payload. Every inserted
+ * value is HTML-escaped when `escape` is true (HTML subject/body — XSS-safe for
+ * tenant/lead free-text). Text bodies keep raw values.
+ */
+export function renderTemplate(
+  template: string,
+  vars: Record<string, unknown>,
+  escape: boolean,
+): string {
+  return template.replace(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g, (_, key: string) => {
+    const value = key in vars ? (vars[key] as unknown) : "";
+    if (value == null) return "";
+    return escape ? escapeHtml(value) : String(value);
+  });
+}
+
+/**
+ * Render a typed message into a provider-agnostic outbound envelope. An optional
+ * override (from the `EmailTemplate` store — "administração simples") replaces
+ * the code defaults for any field it provides; empty/missing fields keep the
+ * built-in template.
+ */
+export function renderEmail(
+  message: EmailMessage,
+  override?: {
+    subject?: string | null;
+    htmlBody?: string | null;
+    textBody?: string | null;
+  },
+): OutboundEmail {
   const r = renderers[message.event](message.payload as never);
+  const vars = message.payload as unknown as Record<string, unknown>;
+
+  const subject = override?.subject ? renderTemplate(override.subject, vars, true) : r.subject;
+  const bodyHtml = override?.htmlBody ? renderTemplate(override.htmlBody, vars, true) : r.html;
+  const text = override?.textBody ? renderTemplate(override.textBody, vars, false) : r.text;
+
   const dedupeKey = [
     "mail",
     message.event,
@@ -322,14 +413,14 @@ export function renderEmail(message: EmailMessage): OutboundEmail {
   ].join(":");
   return {
     to: message.to,
-    subject: r.subject,
+    subject,
     html: layout({
-      title: r.subject,
+      title: subject,
       preheader: r.preheader,
-      bodyHtml: r.html,
+      bodyHtml,
       appUrl: r.appUrl,
     }),
-    text: r.text,
+    text,
     dedupeKey,
   };
 }
@@ -341,9 +432,12 @@ export const EMAIL_EVENT_LABELS: Record<EmailEvent, string> = {
   password_reset: "Redefinição de senha",
   subscription_created: "Assinatura criada",
   invoice_paid: "Pagamento aprovado",
+  invoice_due_soon: "Próximo vencimento",
   invoice_past_due: "Fatura em atraso",
+  last_warning: "Último aviso",
   final_lockout_warning: "Aviso de bloqueio final",
   account_reactivated: "Conta reativada",
+  subscription_cancelled: "Assinatura cancelada",
   new_lead_alert: "Alerta de novo lead",
   visit_request: "Pedido de visita",
   payment_link: "Link de pagamento",

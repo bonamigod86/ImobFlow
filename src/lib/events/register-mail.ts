@@ -8,6 +8,9 @@ import {
   notifyFinalLockout,
   notifyInvoicePaid,
   notifyInvoicePastDue,
+  notifyLastWarning,
+  notifyNextDue,
+  notifySubscriptionCancelled,
   notifySubscriptionCreated,
   notifyWelcomeAccount,
 } from "@/lib/email/notify";
@@ -47,20 +50,58 @@ export function registerMailSubscribers(): void {
   });
 
   eventBus.on("billing.dunning.notified", (p) => {
-    if (p.kind !== "PAYMENT_FAILED") return;
     void (async () => {
       const sub = await prismaUnscoped.tenantSubscription.findUnique({
         where: { id: p.subscriptionId ?? "__none__" },
         include: { plan: { select: { name: true } }, tenant: { select: { name: true } } },
       });
       if (!sub) return;
-      const graceEndsAt = sub.graceEndsAt?.toISOString() ?? null;
-      await notifyInvoicePastDue(p.tenantId, {
+
+      // Dunning email routing:
+      //   - PAYMENT_FAILED → "fatura em atraso" (first failure)
+      //   - PRE_DUE / DUE_REMINDER → "próximo vencimento"
+      //   - LATE_REMINDER        → "último aviso" (before suspension)
+      if (p.kind === "PAYMENT_FAILED") {
+        await notifyInvoicePastDue(p.tenantId, {
+          tenantName: sub.tenant.name,
+          planName: sub.plan.name,
+          amountBRL: centsToBRL(sub.priceCents),
+          dueDate: p.dueDate,
+          graceEndsAt: sub.graceEndsAt?.toISOString() ?? null,
+          appUrl: APP_URL,
+        });
+      } else if (p.kind === "PRE_DUE" || p.kind === "DUE_REMINDER") {
+        await notifyNextDue(p.tenantId, {
+          tenantName: sub.tenant.name,
+          planName: sub.plan.name,
+          amountBRL: centsToBRL(sub.priceCents),
+          dueDate: p.dueDate,
+          appUrl: APP_URL,
+        });
+      } else if (p.kind === "LATE_REMINDER") {
+        await notifyLastWarning(p.tenantId, {
+          tenantName: sub.tenant.name,
+          planName: sub.plan.name,
+          amountBRL: centsToBRL(sub.priceCents),
+          dueDate: p.dueDate,
+          graceEndsAt: sub.graceEndsAt?.toISOString() ?? null,
+          appUrl: APP_URL,
+        });
+      }
+    })();
+  });
+
+  eventBus.on("billing.subscription.cancelled", (p) => {
+    void (async () => {
+      const sub = await prismaUnscoped.tenantSubscription.findUnique({
+        where: { id: p.subscriptionId },
+        include: { plan: { select: { name: true } }, tenant: { select: { name: true } } },
+      });
+      if (!sub) return;
+      await notifySubscriptionCancelled(p.tenantId, {
         tenantName: sub.tenant.name,
         planName: sub.plan.name,
-        amountBRL: centsToBRL(sub.priceCents),
-        dueDate: p.dueDate,
-        graceEndsAt,
+        cancelledAt: p.cancelledAt,
         appUrl: APP_URL,
       });
     })();

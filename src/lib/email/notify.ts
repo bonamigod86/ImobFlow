@@ -6,6 +6,7 @@ import type {
   EmailMessage,
   EmailPayloadMap,
   MailRecipient,
+  OutboundEmail,
 } from "@/lib/email/types";
 import "../events/register";
 
@@ -22,8 +23,29 @@ import "../events/register";
 
 const NOTIFY_NOTE = "[notify] email enqueue failed (non-blocking):";
 
+/**
+ * Resolve an admin override (`EmailTemplate`) for the event, then render. A
+ * disabled/missing override falls back to the code default template. Reads are
+ * best-effort: a store outage never blocks the transactional send.
+ */
+async function renderEmailAsync(message: EmailMessage): Promise<OutboundEmail> {
+  let override: { subject: string | null; htmlBody: string | null; textBody: string | null } | null =
+    null;
+  try {
+    const row = await prismaUnscoped.emailTemplate.findUnique({
+      where: { event: message.event },
+      select: { subject: true, htmlBody: true, textBody: true, enabled: true },
+    });
+    if (row?.enabled === false) row.subject = null;
+    override = row?.subject || row?.htmlBody || row?.textBody ? row : null;
+  } catch {
+    /* non-blocking */
+  }
+  return renderEmail(message, override ?? undefined);
+}
+
 async function enqueue(message: EmailMessage): Promise<void> {
-  const outbound = renderEmail(message);
+  const outbound = await renderEmailAsync(message);
   try {
     await QueueManager.addEmailSend({
       dedupeKey: outbound.dedupeKey,
@@ -147,6 +169,20 @@ export async function notifyInvoicePaid(tenantId: string, opts: {
   }));
 }
 
+/** E-mail #5b — next due date (renewal reminder, before the due day). */
+export async function notifyNextDue(tenantId: string, opts: {
+  tenantName: string;
+  planName: string;
+  amountBRL: string;
+  dueDate: string;
+  appUrl: string;
+}): Promise<void> {
+  await notifyTenant("invoice_due_soon", tenantId, (r) => ({
+    recipientName: r.name ?? r.email,
+    ...opts,
+  }));
+}
+
 /** E-mail #6 — invoice past due warning (first payment failure). */
 export async function notifyInvoicePastDue(tenantId: string, opts: {
   tenantName: string;
@@ -157,6 +193,21 @@ export async function notifyInvoicePastDue(tenantId: string, opts: {
   appUrl: string;
 }): Promise<void> {
   await notifyTenant("invoice_past_due", tenantId, (r) => ({
+    recipientName: r.name ?? r.email,
+    ...opts,
+  }));
+}
+
+/** E-mail #6b — last warning before automatic suspension (LATE_REMINDER). */
+export async function notifyLastWarning(tenantId: string, opts: {
+  tenantName: string;
+  planName: string;
+  amountBRL: string;
+  dueDate: string;
+  graceEndsAt: string | null;
+  appUrl: string;
+}): Promise<void> {
+  await notifyTenant("last_warning", tenantId, (r) => ({
     recipientName: r.name ?? r.email,
     ...opts,
   }));
@@ -182,6 +233,19 @@ export async function notifyAccountReactivated(tenantId: string, opts: {
   appUrl: string;
 }): Promise<void> {
   await notifyTenant("account_reactivated", tenantId, (r) => ({
+    recipientName: r.name ?? r.email,
+    ...opts,
+  }));
+}
+
+/** E-mail #8b — subscription cancelled. */
+export async function notifySubscriptionCancelled(tenantId: string, opts: {
+  tenantName: string;
+  planName: string;
+  cancelledAt: string;
+  appUrl: string;
+}): Promise<void> {
+  await notifyTenant("subscription_cancelled", tenantId, (r) => ({
     recipientName: r.name ?? r.email,
     ...opts,
   }));

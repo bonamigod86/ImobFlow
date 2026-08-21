@@ -20,9 +20,12 @@ const events: EmailEvent[] = [
   "password_reset",
   "subscription_created",
   "invoice_paid",
+  "invoice_due_soon",
   "invoice_past_due",
+  "last_warning",
   "final_lockout_warning",
   "account_reactivated",
+  "subscription_cancelled",
   "new_lead_alert",
   "visit_request",
   "payment_link",
@@ -44,12 +47,18 @@ function makeMessage(event: EmailEvent): EmailMessage {
       return { event, ...base, payload: { recipientName: "Owner", tenantName: "ACME", planName: "Pro", amountBRL: "R$ 499,00", cycle: "Mensal", trialDays: 14, appUrl: base.appUrl } };
     case "invoice_paid":
       return { event, ...base, payload: { recipientName: "Owner", tenantName: "ACME", planName: "Pro", amountBRL: "R$ 499,00", invoiceId: "inv_1", paidAt: "2026-08-19T10:00:00Z", appUrl: base.appUrl } };
+    case "invoice_due_soon":
+      return { event, ...base, payload: { recipientName: "Owner", tenantName: "ACME", planName: "Pro", amountBRL: "R$ 499,00", dueDate: "2026-08-19T00:00:00Z", appUrl: base.appUrl } };
     case "invoice_past_due":
+      return { event, ...base, payload: { recipientName: "Owner", tenantName: "ACME", planName: "Pro", amountBRL: "R$ 499,00", dueDate: "2026-08-10T00:00:00Z", graceEndsAt: "2026-08-17T00:00:00Z", appUrl: base.appUrl } };
+    case "last_warning":
       return { event, ...base, payload: { recipientName: "Owner", tenantName: "ACME", planName: "Pro", amountBRL: "R$ 499,00", dueDate: "2026-08-10T00:00:00Z", graceEndsAt: "2026-08-17T00:00:00Z", appUrl: base.appUrl } };
     case "final_lockout_warning":
       return { event, ...base, payload: { recipientName: "Owner", tenantName: "ACME", reason: "carência", blockedAt: "2026-08-17T00:00:00Z", appUrl: base.appUrl } };
     case "account_reactivated":
       return { event, ...base, payload: { recipientName: "Owner", tenantName: "ACME", planName: "Pro", appUrl: base.appUrl } };
+    case "subscription_cancelled":
+      return { event, ...base, payload: { recipientName: "Owner", tenantName: "ACME", planName: "Pro", cancelledAt: "2026-08-20T12:00:00Z", appUrl: base.appUrl } };
     case "new_lead_alert":
       return { event, ...base, payload: { recipientName: "Owner", tenantName: "ACME", leadName: "João <script>", leadEmail: "joao@x.com", leadPhone: "(11) 9", message: "Olá <b>", propertyTitle: "Apto", propertyUrl: "https://x/p", appUrl: base.appUrl } };
     case "visit_request":
@@ -103,5 +112,43 @@ describe("renderEmail", () => {
       "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;",
     );
     expect(escapeHtml(null)).toBe("");
+  });
+});
+
+describe("renderEmail with admin override (Item 15 — administração simples)", () => {
+  it("substitutes {{variáveis}} from the payload in subject and body", () => {
+    const override = {
+      subject: "Fatura de {{planName}} — {{amountBRL}}",
+      htmlBody: "<p>Olá {{recipientName}}, vence {{dueDate}}.</p>",
+      textBody: "Fatura {{amountBRL}} para {{tenantName}}",
+    };
+    const out = renderEmail(makeMessage("invoice_due_soon"), override);
+
+    expect(out.subject).toBe("Fatura de Pro — R$ 499,00");
+    expect(out.html).toContain("Olá Owner, vence");
+    expect(out.html).toContain("<!DOCTYPE html>");
+    expect(out.text).toBe("Fatura R$ 499,00 para ACME");
+  });
+
+  it("escapes injected values in the HTML override (XSS-safe)", () => {
+    const override = { htmlBody: "<p>{{leadName}}</p>" };
+    const out = renderEmail(makeMessage("new_lead_alert"), override);
+    expect(out.html).not.toContain("<script>");
+    expect(out.html).toContain("&lt;script&gt;");
+  });
+
+  it("keeps the built-in default when override fields are absent", () => {
+    const out = renderEmail(makeMessage("invoice_paid"), {});
+    const def = renderEmail(makeMessage("invoice_paid"));
+    expect(out.subject).toBe(def.subject);
+    expect(out.html).toBe(def.html);
+  });
+
+  it("leaves unknown placeholders and missing vars empty, not broken", () => {
+    const out = renderEmail(makeMessage("account_reactivated"), {
+      subject: "Oi {{recipientName}} {{naoExiste}}",
+      htmlBody: "<p>{{appUrl}}</p>",
+    });
+    expect(out.subject).toBe("Oi Owner ");
   });
 });

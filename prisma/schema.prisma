@@ -430,6 +430,22 @@ model BillingNotification {
   @@index([tenantId, createdAt])
 }
 
+/// Opt-in override for a transactional e-mail template. When a row exists for
+/// an event, its `{{variável}}` template replaces the code default (Checklist
+/// Item 15 — "templates com variáveis e administração simples"). Nullable
+/// fields keep the built-in default; `enabled = false` restores the code default.
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  /// Transactional event key, e.g. `invoice_paid` (matches EmailEvent).
+  event     String   @unique
+  subject   String?
+  htmlBody  String?
+  textBody  String?
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 /// One-off highlight add-on purchase (extra boosts above the plan allowance).
 model HighlightPurchase {
   id              String   @id @default(cuid())
