@@ -1,6 +1,5 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const Dialog = DialogPrimitive.Root;
@@ -45,7 +44,7 @@ const DialogContent = React.forwardRef<
         title="Fechar"
         className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-white shadow transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
       >
-        <X className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
+        <span className="text-lg font-bold leading-none" aria-hidden="true">✕</span>
         <span className="sr-only">Fechar</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>

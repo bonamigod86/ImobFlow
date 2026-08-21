@@ -167,8 +167,8 @@ export function PropertyManager({
         <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
+      <div className="mb-4 flex items-center gap-2 overflow-x-auto">
+        <div className="relative min-w-[10rem] flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             value={q}
@@ -310,7 +310,7 @@ function PropertyCard({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="ml-auto" aria-label="Mais ações" title="Mais ações" disabled={busy}>
+              <Button variant="outline" size="icon-sm" className="ml-auto" aria-label="Mais ações" title="Mais ações" disabled={busy}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
               </Button>
             </DropdownMenuTrigger>
