@@ -28,12 +28,15 @@ export default function LoginForm() {
           tenantSlug: tenantSlug || undefined,
         }),
       });
-      const data = (await res.json()) as { error?: string; message?: string; user?: unknown };
+      const data = (await res.json()) as { error?: string; message?: string; user?: { role?: string } };
       if (!res.ok) {
         setError(data.message ?? data.error ?? "Login failed.");
         return;
       }
-      router.push("/dashboard");
+      // MASTER (plataforma) vai para o painel admin; demais usuários, para o
+      // dashboard do assinante.
+      const isMaster = data.user?.role === "MASTER";
+      router.push(isMaster ? "/admin/dashboard" : "/dashboard");
       router.refresh();
     } catch {
       setError("Network error — try again.");
