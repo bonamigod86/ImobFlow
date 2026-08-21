@@ -169,21 +169,21 @@ export function PropertyManager({
         <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>
       )}
 
-      <div className="mb-4 flex items-center gap-2 overflow-x-auto">
-        <div className="relative min-w-[10rem] flex-1 sm:max-w-xs">
+      <div className="mb-4 flex flex-wrap items-center gap-2.5">
+        <div className="relative min-w-[14rem] flex-1 sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar por título ou código…"
-            className="h-9 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+            className="h-10 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           aria-label="Situação"
-          className="h-9 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+          className="h-10 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
         >
           <option value="">Toda situação</option>
           {(Object.keys(STATUS_LABELS) as Array<keyof typeof STATUS_LABELS>).map((s) => (
@@ -194,7 +194,7 @@ export function PropertyManager({
           value={targetFilter}
           onChange={(e) => setTargetFilter(e.target.value)}
           aria-label="Tipo"
-          className="h-9 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+          className="h-10 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
         >
           <option value="">Tipo (venda/aluguel)</option>
           <option value="SALE">À venda</option>
@@ -205,7 +205,7 @@ export function PropertyManager({
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
           aria-label="Categoria"
-          className="h-9 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+          className="h-10 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
         >
           <option value="">Toda categoria</option>
           {(Object.keys(CATEGORY_LABELS) as Array<keyof typeof CATEGORY_LABELS>).map((c) => (

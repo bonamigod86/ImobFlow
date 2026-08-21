@@ -221,21 +221,21 @@ export default function LeadsTable({
         </div>
       )}
 
-      <div className="flex items-center gap-2 overflow-x-auto rounded-xl border border-slate-200/80 bg-white p-3">
-        <div className="relative min-w-[12rem] flex-1">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/80 bg-white p-3">
+        <div className="relative min-w-[14rem] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar por nome ou e-mail…"
-            className="pl-9"
+            className="h-10 pl-9"
           />
         </div>
         <select
           value={solicitation}
           onChange={(e) => setSolicitation(e.target.value)}
           aria-label="Tipo de solicitação"
-          className="h-9 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+          className="h-10 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
         >
           <option value="">Toda solicitação</option>
           <option>Agendamento de Visita</option>
@@ -247,7 +247,7 @@ export default function LeadsTable({
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           aria-label="Situação"
-          className="h-9 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+            className="h-10 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
         >
           <option value="">Toda situação</option>
           <option value="NEW">Novo</option>
