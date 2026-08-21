@@ -44,11 +44,7 @@ export default async function LandingPage() {
               className="mx-auto mb-6 h-36 w-36 object-contain drop-shadow-sm"
             />
 
-            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/70 px-4 py-1.5 text-sm font-semibold text-emerald-700">
-              ✨ Portal de Imóveis
-            </span>
-
-            <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+            <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
               O endereço certo para o seu próximo passo.
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
