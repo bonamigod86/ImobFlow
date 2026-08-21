@@ -42,7 +42,7 @@ export function HeroSearchForm({ cities = [] }: { cities?: HeroCity[] }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="mx-auto mt-8 grid max-w-5xl grid-cols-1 items-stretch gap-2.5 rounded-2xl border border-navy-200/70 bg-white p-3 shadow-xl shadow-slate-200/70 md:grid-cols-12"
+      className="mx-auto mt-8 grid max-w-5xl grid-cols-1 items-stretch gap-2.5 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xl shadow-slate-200/70 md:grid-cols-12"
     >
       <label className="relative md:col-start-1 md:col-span-12 md:row-start-1">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-400" />
