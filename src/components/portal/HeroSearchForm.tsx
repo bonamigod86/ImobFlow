@@ -33,7 +33,7 @@ export function HeroSearchForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="mx-auto mt-8 flex w-full max-w-3xl flex-col gap-2 rounded-2xl border border-slate-200/70 bg-white p-2 shadow-xl shadow-slate-200/50 sm:flex-row sm:items-center"
+      className="mx-auto mt-8 flex w-full max-w-3xl flex-col gap-2 rounded-2xl border border-slate-100 bg-white p-3 shadow-xl shadow-slate-200/60 sm:flex-row sm:items-center"
     >
       <label className="relative flex-1">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -42,7 +42,7 @@ export function HeroSearchForm() {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Cidade, bairro, código ou palavras-chave…"
           aria-label="Buscar imóveis"
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 transition-colors focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-500 transition-colors focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
         />
       </label>
 
@@ -51,7 +51,7 @@ export function HeroSearchForm() {
           value={target}
           onChange={(e) => setTarget(e.target.value as "" | Target)}
           aria-label="Finalidade"
-          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 outline-none transition-colors focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
+          className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
         >
           <option value="">Venda ou aluguel</option>
           <option value="SALE">Venda</option>
@@ -62,7 +62,7 @@ export function HeroSearchForm() {
           value={category}
           onChange={(e) => setCategory(e.target.value as "" | Category)}
           aria-label="Categoria"
-          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 outline-none transition-colors focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
+          className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
         >
           <option value="">Todas as categorias</option>
           {(Object.keys(CATEGORY_SLUGS) as Category[]).map((cat) => (

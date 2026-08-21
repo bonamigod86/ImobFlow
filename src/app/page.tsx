@@ -32,21 +32,8 @@ export default async function LandingPage() {
       <SiteHeader />
 
       {/* Hero */}
-      <section className="relative overflow-hidden border-b border-slate-100">
-        {/* Semi-transparent backdrop — the portal bg image, dimmed for contrast. */}
-        <div className="absolute inset-0">
-          <Image
-            src="/images/bg.jpg"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-white/70" aria-hidden="true" />
-        </div>
-
-        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:py-24">
+      <section className="border-b border-slate-100 bg-gradient-to-b from-slate-50 via-white to-slate-50">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:py-24">
           <div className="mx-auto max-w-3xl text-center">
             <Image
               src="/images/imobFlow_logo.png"
@@ -62,12 +49,10 @@ export default async function LandingPage() {
             </span>
 
             <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-              Encontre o imóvel dos seus sonhos
+              O endereço certo para o seu próximo passo.
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
-              {featured.length > 0
-                ? `${featured.length} imóveis em destaque, anunciados por imobiliárias parceiras e corretores credenciados.`
-                : "Apartamentos, casas, terrenos e salas comerciais à venda e para aluguel."}
+              Oportunidades selecionadas com curadoria de corretores e imobiliárias credenciadas.
             </p>
 
             <HeroSearchForm />
