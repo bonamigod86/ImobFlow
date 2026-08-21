@@ -33,7 +33,7 @@ export function HeroSearchForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="mx-auto mt-8 flex w-full max-w-3xl flex-col gap-2 rounded-2xl border border-slate-100 bg-white p-3 shadow-xl shadow-slate-200/60 sm:flex-row sm:items-center"
+      className="mx-auto mt-8 flex w-full max-w-4xl flex-col gap-2 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xl shadow-slate-200/70 md:p-4 sm:flex-row sm:items-center"
     >
       <label className="relative flex-1">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

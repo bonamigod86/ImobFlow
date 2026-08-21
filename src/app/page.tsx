@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, Building, Building2, Home, Key, ShieldCheck, Zap } from "lucide-react";
 import { listCities, listFeatured, listLatest } from "@/lib/public/repository";
@@ -32,17 +31,12 @@ export default async function LandingPage() {
       <SiteHeader />
 
       {/* Hero */}
-      <section className="border-b border-slate-100 bg-gradient-to-b from-slate-50 via-white to-slate-50">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:py-24">
+      <section className="relative bg-gradient-to-b from-slate-100 via-slate-50/60 to-white pt-12 pb-16 border-b border-slate-100">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="mx-auto max-w-3xl text-center">
-            <Image
-              src="/images/imobFlow_logo.png"
-              alt="ImobFlow"
-              width={160}
-              height={160}
-              priority
-              className="mx-auto mb-6 h-36 w-36 object-contain drop-shadow-sm"
-            />
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-1.5 text-xs font-semibold text-emerald-700">
+              ✨ Oportunidades Selecionadas
+            </div>
 
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
               O endereço certo para o seu próximo passo.
@@ -73,7 +67,7 @@ export default async function LandingPage() {
               <Link
                 key={l.label}
                 href={l.href}
-                className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-50 hover:shadow-md hover:text-brand-700"
+                className="group flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow"
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-100">
                   <l.icon className="h-5 w-5" />
