@@ -56,6 +56,7 @@ function ReadonlySelect({
  */
 export function SearchFilters({
   initial = {},
+  cities = [],
 }: {
   initial?: {
     q?: string;
@@ -70,12 +71,27 @@ export function SearchFilters({
     minParking?: string;
     minArea?: string;
     furnished?: string;
+    city?: string;
   };
+  cities?: Array<{ slug: string; city: string; state?: string }>;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
+
+  // Derive the current path segments and the "rest" after the leading city
+  // segment, so switching city keeps every other filter (path + query) intact.
+  const segs = pathname.split("/").filter(Boolean);
+  let rest = segs.slice(1); // drop "imoveis"
+  if (rest[0] && rest[0] === initial.city) rest = rest.slice(1);
+
+  const goCity = (slug: string) => {
+    const base = ["/imoveis", ...(slug ? [slug] : []), ...rest].join("/");
+    startTransition(() => {
+      router.push(`${base}?${searchParams.toString()}`, { scroll: false });
+    });
+  };
 
   const apply = useCallback(
     (patch: Record<string, string | null>) => {
@@ -122,6 +138,21 @@ export function SearchFilters({
             />
           </div>
         </div>
+
+        {cities.length > 0 && (
+          <div className="col-span-2 md:col-span-2 lg:col-span-2">
+            <label className="mb-1 block text-xs font-medium text-slate-500">Cidade</label>
+            <ReadonlySelect value={initial.city ?? ""} onChange={goCity}>
+              <option value="">Todas as cidades</option>
+              {cities.map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.city}
+                  {c.state ? ` · ${c.state}` : ""}
+                </option>
+              ))}
+            </ReadonlySelect>
+          </div>
+        )}
 
         <div className="col-span-2 md:col-span-2 lg:col-span-2">
           <label className="mb-1 block text-xs font-medium text-slate-500">Bairro</label>

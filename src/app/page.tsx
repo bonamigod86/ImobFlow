@@ -45,7 +45,7 @@ export default async function LandingPage() {
               Oportunidades selecionadas com curadoria de corretores e imobiliárias credenciadas.
             </p>
 
-            <HeroSearchForm />
+            <HeroSearchForm cities={cities} />
 
             <Link
               href="/imoveis"

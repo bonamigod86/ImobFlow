@@ -8,19 +8,28 @@ import { CATEGORY_LABELS, CATEGORY_SLUGS, TARGET_SLUGS } from "@/lib/public/type
 type Category = keyof typeof CATEGORY_SLUGS;
 type Target = keyof typeof TARGET_SLUGS;
 
+export interface HeroCity {
+  slug: string;
+  city: string;
+  state?: string;
+}
+
 /**
- * Hero search form (home). Builds the portal's listing URL from free-text plus
- * target/category — keeps the same path/query contract as `/imoveis[...]`.
+ * Hero search form (home). Builds the portal's listing URL from city +
+ * free-text + target/category — keeps the same path/query contract as
+ * `/imoveis[city][target][category]?q=…`.
  */
-export function HeroSearchForm() {
+export function HeroSearchForm({ cities = [] }: { cities?: HeroCity[] }) {
   const router = useRouter();
   const [q, setQ] = useState("");
+  const [city, setCity] = useState("");
   const [target, setTarget] = useState<"" | Target>("");
   const [category, setCategory] = useState<"" | Category>("");
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const segments: string[] = [];
+    if (city) segments.push(city);
     if (target) segments.push(TARGET_SLUGS[target]);
     if (category) segments.push(CATEGORY_SLUGS[category]);
 
@@ -33,20 +42,38 @@ export function HeroSearchForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="mx-auto mt-8 flex w-full max-w-4xl flex-col gap-2 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xl shadow-slate-200/70 md:p-4 sm:flex-row sm:items-center"
+      className="mx-auto mt-8 flex w-full max-w-4xl flex-col gap-2 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xl shadow-slate-200/70 md:p-4"
     >
-      <label className="relative flex-1">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Cidade, bairro, código ou palavras-chave…"
-          aria-label="Buscar imóveis"
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-500 transition-colors focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
-        />
-      </label>
+      {/* Cidade — full-width, first control */}
+      {cities.length > 0 && (
+        <select
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          aria-label="Cidade"
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 outline-none transition-colors focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
+        >
+          <option value="">Todas as cidades</option>
+          {cities.map((c) => (
+            <option key={c.slug} value={c.slug}>
+              {c.city}
+              {c.state ? ` · ${c.state}` : ""}
+            </option>
+          ))}
+        </select>
+      )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <label className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Bairro, código ou palavras-chave…"
+            aria-label="Buscar imóveis"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-500 transition-colors focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
+          />
+        </label>
+
         <select
           value={target}
           onChange={(e) => setTarget(e.target.value as "" | Target)}
@@ -71,15 +98,15 @@ export function HeroSearchForm() {
             </option>
           ))}
         </select>
-      </div>
 
-      <button
-        type="submit"
-        className="inline-flex shrink-0 items-center rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
-      >
-        <Search className="mr-2 h-4 w-4" />
-        Buscar
-      </button>
+        <button
+          type="submit"
+          className="inline-flex shrink-0 items-center rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+        >
+          <Search className="mr-2 h-4 w-4" />
+          Buscar
+        </button>
+      </div>
     </form>
   );
 }

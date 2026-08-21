@@ -5,7 +5,7 @@ import { SiteFooter } from "@/components/portal/SiteFooter";
 import { SearchFilters } from "@/components/portal/SearchFilters";
 import { PropertyCard } from "@/components/portal/PropertyCard";
 import { Pagination } from "@/components/portal/Pagination";
-import { searchListings, resolveCitySlug } from "@/lib/public/repository";
+import { listCities, searchListings, resolveCitySlug } from "@/lib/public/repository";
 import { CATEGORY_FROM_SLUG, CATEGORY_LABELS, TARGET_FROM_SLUG, TARGET_LABELS } from "@/lib/public/types";
 import type { PublicListingFilters } from "@/lib/public/types";
 import { searchMetadata } from "@/lib/public/seo";
@@ -81,9 +81,10 @@ async function getSearchData(filters?: string[], sp: Record<string, string | str
 
   if (sp.featured === "true") base.featured = true;
 
-  const [result, cityMatches] = await Promise.all([
+  const [result, cityMatches, cities] = await Promise.all([
     searchListings(base, { page, sort: sort as never }),
     parsed.citySlug ? resolveCitySlug(parsed.citySlug) : Promise.resolve([]),
+    listCities(),
   ]);
 
   const cityLabel = cityMatches.length > 0 ? cityMatches.map((c) => c.city).join(" · ") : (parsed.citySlug ?? null);
@@ -93,7 +94,13 @@ async function getSearchData(filters?: string[], sp: Record<string, string | str
     parsed.category ? CATEGORY_LABELS[parsed.category] : null,
   ].filter(Boolean);
 
-  return { result, cityLabel: cityLabel ?? null, title: titleBits.length ? titleBits.join(" · ") : "Imóveis" };
+  return {
+    result,
+    cityLabel: cityLabel ?? null,
+    citySlug: parsed.citySlug ?? null,
+    cities,
+    title: titleBits.length ? titleBits.join(" · ") : "Imóveis",
+  };
 }
 
 export default async function SearchPage({ params, searchParams }: PageProps) {
@@ -151,7 +158,9 @@ export default async function SearchPage({ params, searchParams }: PageProps) {
             target: result.filters.target,
             category: result.filters.category,
             sort: single(searchParams.sort),
+            city: data.citySlug ?? undefined,
           }}
+          cities={data.cities}
         />
 
         {result.total > 0 ? (
