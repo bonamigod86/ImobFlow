@@ -31,6 +31,8 @@ export interface PropertyRow {
   slug?: string | null;
   isActive: boolean;
   isFeatured: boolean;
+  assignedToId?: string | null;
+  assignedTo?: { id: string; name: string; photoUrl?: string | null } | null;
   coverImage: string | null;
   createdAt: string;
   updatedAt: string;

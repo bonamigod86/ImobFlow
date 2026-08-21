@@ -53,6 +53,7 @@ export const propertySchema = z
     isFeatured: z.boolean().optional().default(false),
     isFurnished: z.boolean().optional().default(false),
     isActive: z.boolean().optional().default(true),
+    assignedToId: z.string().trim().max(64).optional().nullable(),
   })
   .refine(
     (v) => v.salePrice != null || v.rentPrice != null,

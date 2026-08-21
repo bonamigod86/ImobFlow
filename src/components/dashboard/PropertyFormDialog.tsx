@@ -54,6 +54,7 @@ type FormState = {
   isActive: boolean;
   isFeatured: boolean;
   isFurnished: boolean;
+  assignedToId: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -84,6 +85,7 @@ const EMPTY_FORM: FormState = {
   isActive: true,
   isFeatured: false,
   isFurnished: false,
+  assignedToId: "",
 };
 
 function toNumberOrNull(value: string): number | null {
@@ -117,6 +119,15 @@ export function FormDialog({
   const [error, setError] = useState<string | null>(null);
   // Target for the gallery (set on create success or via the edit shortcut).
   const [mediaFor, setMediaFor] = useState<{ id: string; title: string } | null>(null);
+  const [team, setTeam] = useState<Array<{ id: string; name: string; role: string }>>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/team/users")
+      .then((r) => r.json())
+      .then((d) => setTeam(Array.isArray(d?.users) ? d.users : []))
+      .catch(() => setTeam([]));
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -152,6 +163,7 @@ export function FormDialog({
         isActive: editing.isActive,
         isFeatured: editing.isFeatured,
         isFurnished: editing.isFurnished ?? false,
+        assignedToId: editing.assignedToId ?? "",
       });
     } else {
       setForm(EMPTY_FORM);
@@ -207,6 +219,7 @@ export function FormDialog({
       isActive: form.isActive,
       isFeatured: form.isFeatured,
       isFurnished: form.isFurnished,
+      assignedToId: form.assignedToId || null,
     };
 
     setBusy(true);
@@ -284,6 +297,16 @@ export function FormDialog({
               {STATUS_OPTIONS.map((key) => (
                 <option key={key} value={key}>
                   {STATUS_LABELS[key]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Corretor responsável" hint="equipe">
+            <Select value={form.assignedToId} onChange={(e) => update("assignedToId", e.target.value)}>
+              <option value="">Sem corretor</option>
+              {team.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
                 </option>
               ))}
             </Select>

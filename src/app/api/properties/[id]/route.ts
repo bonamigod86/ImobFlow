@@ -52,6 +52,7 @@ function buildPatchData(body: PropertyPatchInput) {
     isFeatured: body.isFeatured,
     isFurnished: body.isFurnished,
     isActive: body.isActive,
+    assignedToId: body.assignedToId ?? null,
   } as Prisma.PropertyUncheckedUpdateInput;
 }
 

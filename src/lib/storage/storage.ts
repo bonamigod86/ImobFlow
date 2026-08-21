@@ -6,6 +6,8 @@ import {
   HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import path from "node:path";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { env } from "@/lib/config/env";
 
 /**
@@ -114,35 +116,50 @@ class S3Storage implements StorageAdapter {
   }
 }
 
-/** In-proc fallback so local dev/tests work without a bucket. */
+/** Disk-backed fallback so local dev uploads SURVIVE server restarts. */
 class LocalStorage implements StorageAdapter {
-  private objects = new Map<string, Buffer>();
-  private counter = 0;
+  private root = path.join(process.cwd(), ".data", "media");
+
+  private file(key: string): string {
+    // Keys may contain "/" — keep the structure, but never escape the root.
+    const safe = key.replace(/\.\./g, "__").replace(/^\/+/, "");
+    return path.join(this.root, safe);
+  }
+
+  private async write(file: string, body: Buffer | Uint8Array): Promise<void> {
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, body);
+  }
 
   async presignPut(): Promise<string> {
-    return `local://put/${this.counter++}`;
+    return "local://put";
   }
   async presignGet(): Promise<string> {
-    return `local://get/${this.counter++}`;
+    return "local://get";
   }
   async put(key: string, body: Buffer | Uint8Array): Promise<void> {
-    this.objects.set(key, Buffer.from(body));
+    await this.write(this.file(key), body);
   }
   async get(key: string): Promise<Buffer> {
-    const buf = this.objects.get(key);
-    if (!buf) throw new Error(`Object not found in local storage: ${key}`);
-    return buf;
+    try {
+      return await readFile(this.file(key));
+    } catch {
+      throw new Error(`Object not found in local storage: ${key}`);
+    }
   }
   async head(key: string): Promise<{ size: number; contentType?: string }> {
-    const buf = this.objects.get(key);
-    if (!buf) throw new Error(`Object not found in local storage: ${key}`);
-    return { size: buf.length, contentType: "application/octet-stream" };
+    try {
+      const s = await stat(this.file(key));
+      return { size: s.size, contentType: "application/octet-stream" };
+    } catch {
+      throw new Error(`Object not found in local storage: ${key}`);
+    }
   }
   async delete(key: string): Promise<void> {
-    this.objects.delete(key);
+    await rm(this.file(key), { force: true });
   }
-  reset(): void {
-    this.objects.clear();
+  async reset(): Promise<void> {
+    await rm(this.root, { recursive: true, force: true });
   }
 }
 
@@ -157,7 +174,7 @@ export function publicUrlForKey(key: string): string {
   return `${env.S3_PUBLIC_BASE_URL}/${encodeURIComponent(key)}`;
 }
 
-/** Reset the local fallback (tests). */
+/** Reset the local disk store (tests). */
 export function resetLocalStorage(): void {
-  if (storage instanceof LocalStorage) storage.reset();
+  if (storage instanceof LocalStorage) void storage.reset();
 }

@@ -100,14 +100,14 @@ function FileUpload({
 }: {
   labelText: string;
   value: string;
-  onChange: (dataUrl: string) => void;
+  onChange: (url: string) => void;
   previewFor: "logo" | "photo";
 }) {
   const [reading, setReading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const onFile = useCallback(
-    (f: File | undefined) => {
+    async (f: File | undefined) => {
       if (!f) return;
       setErr(null);
       if (!f.type.startsWith("image/")) {
@@ -119,13 +119,22 @@ function FileUpload({
         return;
       }
       setReading(true);
-      const reader = new FileReader();
-      reader.onload = () => onChange(String(reader.result));
-      reader.onerror = () => setErr("Não foi possível ler o arquivo.");
-      reader.onloadend = () => setReading(false);
-      reader.readAsDataURL(f);
+      try {
+        const res = await fetch(`/api/tenant/profile/image?kind=${previewFor}`, {
+          method: "POST",
+          headers: { "content-type": f.type },
+          body: f,
+        });
+        const data = (await res.json().catch(() => ({}))) as { url?: string; message?: string };
+        if (!res.ok || !data.url) throw new Error(data.message ?? "Falha no upload.");
+        onChange(data.url);
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : "Falha no upload.");
+      } finally {
+        setReading(false);
+      }
     },
-    [onChange],
+    [onChange, previewFor],
   );
 
   return (

@@ -46,7 +46,9 @@ function isPublicPath(pathname: string): boolean {
     pathname.startsWith("/api/billing/webhooks") ||
     // Public media bytes (PDP gallery) — READY media is public; mutating
     // media routes still enforce auth inside the route handler.
-    pathname.startsWith("/api/media/")
+    pathname.startsWith("/api/media/") ||
+    // Public tenant/broker avatar bytes (PDP "anunciado por").
+    pathname.startsWith("/api/tenant/profile/image")
   );
 }
 

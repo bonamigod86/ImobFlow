@@ -31,6 +31,13 @@ const updateLeadSchema = z.object({
   status: z.enum(VALID_STATUSES).optional(),
   note: z.string().trim().max(2000).optional(),
   assignedToId: z.string().trim().min(1).max(64).optional(),
+  /** Confirmação de visita pelo corretor (data/hora) → link do Google Agenda. */
+  visit: z
+    .object({
+      date: z.string().trim().min(1),
+      time: z.string().trim().min(1),
+    })
+    .optional(),
 });
 
 type RouteParams = Record<string, string | string[] | undefined>;
@@ -38,6 +45,22 @@ type RouteParams = Record<string, string | string[] | undefined>;
 function idOf(params: RouteParams): string | undefined {
   const id = params.id;
   return Array.isArray(id) ? id[0] : id;
+}
+
+/** Deep link to the Google Agenda "create event" template (local time, 1h). */
+function googleCalendarUrl(date: string, time: string, title: string): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  const [y, m, d] = date.split("-").map(Number);
+  const [hh, mm] = time.split(":").map(Number);
+  const start = new Date(y ?? 0, (m ?? 1) - 1, d ?? 1, hh ?? 0, mm ?? 0);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  const fmt = (x: Date) =>
+    `${x.getFullYear()}${p(x.getMonth() + 1)}${p(x.getDate())}T${p(x.getHours())}${p(x.getMinutes())}00`;
+  const url = new URL("https://calendar.google.com/calendar/render");
+  url.searchParams.set("action", "TEMPLATE");
+  url.searchParams.set("text", title ? `Visita - ${title}` : "Visita");
+  url.searchParams.set("dates", `${fmt(start)}/${fmt(end)}`);
+  return url.toString();
 }
 
 const DETAIL_SELECT = {
@@ -116,6 +139,17 @@ export const PATCH = withApiRoute(ACTIONS.LEADS_UPDATE, async (ctx, req, params)
         ? {
             statusUpdatedAt: new Date().toISOString(),
             ...(body.status === "QUALIFIED" ? { qualifiedAt: new Date().toISOString() } : {}),
+          }
+        : {}),
+      ...(body.visit
+        ? {
+            visit: {
+              date: body.visit.date,
+              time: body.visit.time,
+              confirmedBy: ctx.userId,
+              confirmedAt: new Date().toISOString(),
+              googleLink: googleCalendarUrl(body.visit.date, body.visit.time, String(payload.title ?? "")),
+            },
           }
         : {}),
     },

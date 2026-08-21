@@ -17,6 +17,7 @@ import {
   Star,
   StarOff,
   Trash2,
+  UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -302,6 +303,12 @@ function PropertyCard({
           <MapPin className="h-3.5 w-3.5" />
           <span className="truncate">{locationForRow(property) || "Sem localização"}</span>
         </p>
+        {property.assignedTo && (
+          <p className="mt-1 flex items-center gap-1 text-xs text-emerald-700">
+            <UserRound className="h-3.5 w-3.5" />
+            {property.assignedTo.name}
+          </p>
+        )}
         <div className="mt-3 flex items-center justify-between gap-2">
           <div>
             <span className="text-base font-extrabold text-slate-900 tabular-nums">

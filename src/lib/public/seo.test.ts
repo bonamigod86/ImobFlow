@@ -38,7 +38,8 @@ const property: PublicProperty = {
   images: [],
   coverImage: null,
   videos: [],
-  broker: { id: "u1", name: "Agente ACME", email: "agent@acme.com", phone: null },
+  broker: { id: "u1", name: "Agente ACME", email: "agent@acme.com", phone: null, photoUrl: null },
+  tenantLogoUrl: null,
 };
 
 describe("format", () => {

@@ -118,7 +118,7 @@ function sortArgs(sort: PublicSort): Prisma.PropertyOrderByWithRelationInput[] {
 
 const LISTING_INCLUDE = (): Prisma.PropertyInclude => ({
   ...mediaInclude(),
-  tenant: { select: { id: true, name: true, slug: true } },
+  tenant: { select: { id: true, name: true, slug: true, logoUrl: true } },
 });
 
 /** City directory (grouped counts) used for the landing page + filter facets. */
@@ -248,9 +248,11 @@ async function brokerFor(tenantId: string): Promise<PublicBroker | null> {
   const user = await prismaUnscoped.user.findFirst({
     where: { tenantId, isActive: true, role: { in: ["OWNER", "MANAGER", "AGENT"] } },
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, email: true, phone: true },
+    select: { id: true, name: true, email: true, phone: true, photoUrl: true },
   });
-  return user ? { id: user.id, name: user.name, email: user.email, phone: user.phone } : null;
+  return user
+    ? { id: user.id, name: user.name, email: user.email, phone: user.phone, photoUrl: user.photoUrl }
+    : null;
 }
 
 function decimalString(v: Prisma.Decimal | null | undefined): string | null {
@@ -282,6 +284,7 @@ async function resolveToPublic(rows: ListingRow[]): Promise<PublicProperty[]> {
         tenantId: r.tenantId,
         tenantName: r.tenant.name,
         tenantSlug: r.tenant.slug,
+        tenantLogoUrl: r.tenant.logoUrl ?? null,
         code: r.code,
         title: r.title,
         description: r.description,

@@ -35,4 +35,4 @@ yarn-error.log*
 .vscode/
 .vercel
 *~
-tsconfig.tsbuildinfo
+tsconfig.tsbuildinfo.data/

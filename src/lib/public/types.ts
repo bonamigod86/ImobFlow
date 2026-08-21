@@ -7,6 +7,8 @@ export interface PublicProperty {
   tenantId: string;
   tenantName: string;
   tenantSlug: string;
+  /** Tenant logo (public URL) for the "anunciado por" avatar; null when unset. */
+  tenantLogoUrl: string | null;
   code: string;
   title: string;
   description: string | null;
@@ -60,6 +62,8 @@ export interface PublicBroker {
   email: string;
   /** Contact phone (WhatsApp deep-link on the PDP); null when unset. */
   phone: string | null;
+  /** Broker avatar (public URL); null when unset. */
+  photoUrl: string | null;
 }
 
 /** Normalized, URL-safe city slug used in routes: `/imoveis/sao-paulo/venda/...`. */

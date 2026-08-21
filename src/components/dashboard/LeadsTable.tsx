@@ -140,6 +140,21 @@ function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }
 
+function googleCalendarUrl(date: string, time: string, title: string): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  const [y, m, d] = date.split("-").map(Number);
+  const [hh, mm] = time.split(":").map(Number);
+  const start = new Date(y ?? 0, (m ?? 1) - 1, d ?? 1, hh ?? 0, mm ?? 0);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  const fmt = (x: Date) =>
+    `${x.getFullYear()}${p(x.getMonth() + 1)}${p(x.getDate())}T${p(x.getHours())}${p(x.getMinutes())}00`;
+  const url = new URL("https://calendar.google.com/calendar/render");
+  url.searchParams.set("action", "TEMPLATE");
+  url.searchParams.set("text", title ? `Visita - ${title}` : "Visita");
+  url.searchParams.set("dates", `${fmt(start)}/${fmt(end)}`);
+  return url.toString();
+}
+
 export default function LeadsTable({
   limit,
   showHeader = true,
@@ -418,6 +433,35 @@ function LeadDetailDialog({ lead, onClose }: { lead: LeadItem; onClose: () => vo
   const fp = lead.financeProfile;
   const solicitation = solicitationType(lead);
 
+  const visit = asRecord(payload?.visit);
+  const [vDate, setVDate] = useState(typeof schedule?.date === "string" ? schedule.date : "");
+  const [vTime, setVTime] = useState(typeof schedule?.time === "string" ? schedule.time : "");
+  const [confirmed, setConfirmed] = useState<{ date: string; time: string; link: string } | null>(
+    visit && typeof visit.date === "string" && typeof visit.time === "string"
+      ? {
+          date: visit.date,
+          time: visit.time,
+          link: typeof visit.googleLink === "string" ? visit.googleLink : googleCalendarUrl(visit.date, visit.time, lead.property?.title ?? ""),
+        }
+      : null,
+  );
+  const [confirmBusy, setConfirmBusy] = useState(false);
+
+  async function confirmVisit() {
+    if (!vDate || !vTime) return;
+    setConfirmBusy(true);
+    try {
+      await fetch(`/api/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ visit: { date: vDate, time: vTime } }),
+      });
+      setConfirmed({ date: vDate, time: vTime, link: googleCalendarUrl(vDate, vTime, lead.property?.title ?? "") });
+    } finally {
+      setConfirmBusy(false);
+    }
+  }
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-lg">
@@ -445,12 +489,60 @@ function LeadDetailDialog({ lead, onClose }: { lead: LeadItem; onClose: () => vo
             </p>
             {message && <p className="mt-2 text-xs text-ink-300">Mensagem: “{truncate(message, 220)}”</p>}
             {schedule && !!(schedule.date || schedule.time) && (
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-ink-300">
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
                 <CalendarClock className="h-3.5 w-3.5" />
-                Visita: {String(schedule.date ?? "")} {String(schedule.time ?? "")}
+                Solicitado: {String(schedule.date ?? "")} {String(schedule.time ?? "")}
               </p>
             )}
           </div>
+
+          {(schedule && !!(schedule.date || schedule.time)) || confirmed ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                <CalendarClock className="h-4 w-4 text-emerald-600" />
+                Visita — confirme o horário
+              </p>
+              {confirmed ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-600">
+                    Horário confirmado: <strong>{confirmed.date}</strong> às <strong>{confirmed.time}</strong>
+                  </p>
+                  <a
+                    href={confirmed.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Adicionar ao Google Agenda
+                  </a>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="date"
+                    value={vDate}
+                    onChange={(e) => setVDate(e.target.value)}
+                    className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="time"
+                    value={vTime}
+                    onChange={(e) => setVTime(e.target.value)}
+                    className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void confirmVisit()}
+                    disabled={confirmBusy || !vDate || !vTime}
+                    className="h-9 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {confirmBusy ? "Salvando…" : "Confirmar horário"}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
 
           {fp && (
             <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">

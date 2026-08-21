@@ -168,9 +168,18 @@ export default async function PDP({ params }: PDPProps) {
               <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-100/80">Fale direto</h2>
 
               <div className="mt-4 flex items-center gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/15 text-white">
-                  <Building2 className="h-6 w-6" />
-                </div>
+                {property.broker?.photoUrl || property.tenantLogoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={property.broker?.photoUrl ?? property.tenantLogoUrl ?? ""}
+                    alt={property.broker?.name ?? property.tenantName}
+                    className="h-12 w-12 shrink-0 rounded-full border border-white/30 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/15 text-white">
+                    <Building2 className="h-6 w-6" />
+                  </div>
+                )}
                 <div>
                   <p className="font-semibold text-white">{property.broker?.name ?? property.tenantName}</p>
                   <p className="text-sm text-emerald-100/90">

@@ -67,6 +67,7 @@ export const GET = withApiRoute(ACTIONS.PROPERTIES_READ, async (_ctx, req) => {
           orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
           take: 1,
         },
+        assignedTo: { select: { id: true, name: true, photoUrl: true } },
       },
     }),
     prisma.property.count({ where }),
@@ -115,6 +116,7 @@ export const POST = withApiRoute(ACTIONS.PROPERTIES_CREATE, async (ctx, req) => 
       isFeatured: body.isFeatured,
       isFurnished: body.isFurnished,
       isActive: body.isActive,
+      assignedToId: body.assignedToId ?? null,
       ...publicIdentity,
     } as Prisma.PropertyUncheckedCreateInput,
   });
