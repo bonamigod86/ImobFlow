@@ -1,21 +1,21 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { ACTIONS } from "@/lib/rbac/actions";
 import { withApiRoute } from "@/lib/http/route-wrapper";
 import { ok, fail } from "@/lib/http/errors";
-import { prisma } from "@/lib/prisma/client";
+import { prisma, prismaUnscoped } from "@/lib/prisma/client";
 import { storage } from "@/lib/storage/storage";
 import { finalizeLocalMedia } from "@/lib/media/media-service";
 
 /**
- * GET /api/media/[mediaId]/bytes  — serves the stored object (local fallback
- * renderer; real storage rows can also be rendered through here for a uniform
- * dashboard experience).
+ * GET /api/media/[mediaId]/bytes  — PUBLIC. Serves the stored object for READY
+ * media (the public portal PDP gallery shows images to anonymous visitors, so
+ * this route must NOT require a session). Only `READY` rows are served; the
+ * bytes themselves are the listing images, public by nature. Mutations (POST
+ * below, DELETE/PATCH elsewhere) remain authenticated.
  *
  * POST /api/media/[mediaId]/bytes — local/dev store-and-finalize: the browser
  * sends raw bytes, the server persists them in the in-proc object store and
  * marks the PENDING row READY (no presigned host / worker needed).
- *
- * Both are tenant-scoped through the ambient Prisma extension.
  */
 
 type RouteParams = Record<string, string | string[] | undefined>;
@@ -27,10 +27,16 @@ function normalizeId(params: RouteParams): string | undefined {
 
 const MAX_LOCAL_BYTES = 100 * 1024 * 1024;
 
-export const GET = withApiRoute(ACTIONS.PROPERTIES_READ, async (_ctx, _req, params) => {
+export async function GET(
+  req: NextRequest,
+  ctx: { params: Promise<RouteParams> },
+): Promise<NextResponse> {
+  const params = await ctx.params;
   const mediaId = normalizeId(params) as string;
-  const media = await prisma.propertyMedia.findUnique({ where: { id: mediaId } });
-  if (!media || !media.objectKey) return fail(404, "NOT_FOUND", "Media not found.");
+  const media = await prismaUnscoped.propertyMedia.findUnique({ where: { id: mediaId } });
+  if (!media || !media.objectKey || media.status !== "READY") {
+    return fail(404, "NOT_FOUND", "Media not found.");
+  }
 
   let buffer: Buffer;
   try {
@@ -48,11 +54,11 @@ export const GET = withApiRoute(ACTIONS.PROPERTIES_READ, async (_ctx, _req, para
     status: 200,
     headers: {
       "Content-Type": media.mimeType ?? "application/octet-stream",
-      "Cache-Control": "private, max-age=3600",
+      "Cache-Control": "public, max-age=86400, immutable",
       "Content-Length": String(buffer.length),
     },
   });
-});
+}
 
 export const POST = withApiRoute(ACTIONS.PROPERTIES_UPDATE, async (ctx, req, params) => {
   const mediaId = normalizeId(params) as string;

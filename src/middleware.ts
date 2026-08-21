@@ -43,7 +43,10 @@ function isPublicPath(pathname: string): boolean {
     // Public lead intake (portal forms) — auth comes from its own rate limit.
     pathname.startsWith("/api/public/") ||
     // Provider webhooks — authenticated by gateway signature, not session.
-    pathname.startsWith("/api/billing/webhooks")
+    pathname.startsWith("/api/billing/webhooks") ||
+    // Public media bytes (PDP gallery) — READY media is public; mutating
+    // media routes still enforce auth inside the route handler.
+    pathname.startsWith("/api/media/")
   );
 }
 
