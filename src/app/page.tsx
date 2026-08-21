@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, Building2, ShieldCheck, Zap } from "lucide-react";
+import { ArrowRight, BadgeCheck, Building, Building2, Home, Key, ShieldCheck, Zap } from "lucide-react";
 import { listCities, listFeatured, listLatest } from "@/lib/public/repository";
 import { SITE_NAME } from "@/lib/public/seo";
 import { SiteHeader } from "@/components/portal/SiteHeader";
@@ -32,8 +32,11 @@ export default async function LandingPage() {
       <SiteHeader />
 
       {/* Hero */}
-      <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:py-24">
+      <section className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-b from-slate-50 via-white to-white">
+        <div className="pointer-events-none absolute -left-20 top-0 h-72 w-72 rounded-full bg-emerald-100/40 blur-3xl" />
+        <div className="pointer-events-none absolute -right-20 top-10 h-72 w-72 rounded-full bg-sky-100/30 blur-3xl" />
+
+        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:py-24">
           <div className="mx-auto max-w-3xl text-center">
             <Image
               src="/images/imobFlow_logo.png"
@@ -41,13 +44,17 @@ export default async function LandingPage() {
               width={160}
               height={160}
               priority
-              className="mx-auto mb-6 h-36 w-36 object-contain"
+              className="mx-auto mb-6 h-36 w-36 object-contain drop-shadow-sm"
             />
-            <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-brand-600">Portal de imóveis</p>
-            <h1 className="text-4xl font-bold tracking-tight text-navy-900 sm:text-5xl">
+
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/70 px-4 py-1.5 text-sm font-semibold text-emerald-700">
+              ✨ Portal de Imóveis
+            </span>
+
+            <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
               Encontre o imóvel dos seus sonhos
             </h1>
-            <p className="mt-4 text-lg text-slate-600">
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
               {featured.length > 0
                 ? `${featured.length} imóveis em destaque, anunciados por imobiliárias parceiras e corretores credenciados.`
                 : "Apartamentos, casas, terrenos e salas comerciais à venda e para aluguel."}
@@ -64,21 +71,24 @@ export default async function LandingPage() {
             </Link>
           </div>
 
-          {/* Quick links */}
+          {/* Category shortcut cards */}
           <div className="mx-auto mt-12 grid max-w-4xl gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { label: "Apartamentos à venda", href: `/imoveis/venda/${CATEGORY_SLUGS.APARTMENT}` },
-              { label: "Casas à venda", href: `/imoveis/venda/${CATEGORY_SLUGS.HOUSE}` },
-              { label: "Apartamentos para alugar", href: `/imoveis/aluguel/${CATEGORY_SLUGS.APARTMENT}` },
-              { label: "Casas para alugar", href: `/imoveis/aluguel/${CATEGORY_SLUGS.HOUSE}` },
+              { icon: Building, label: "Apartamentos à venda", href: `/imoveis/venda/${CATEGORY_SLUGS.APARTMENT}` },
+              { icon: Home, label: "Casas à venda", href: `/imoveis/venda/${CATEGORY_SLUGS.HOUSE}` },
+              { icon: Key, label: "Apartamentos para alugar", href: `/imoveis/aluguel/${CATEGORY_SLUGS.APARTMENT}` },
+              { icon: Key, label: "Casas para alugar", href: `/imoveis/aluguel/${CATEGORY_SLUGS.HOUSE}` },
             ].map((l) => (
               <Link
                 key={l.label}
                 href={l.href}
-                className="group flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-50 hover:shadow-md hover:text-brand-700"
               >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-100">
+                  <l.icon className="h-5 w-5" />
+                </span>
                 {l.label}
-                <ArrowRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5" />
+                <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />
               </Link>
             ))}
           </div>
