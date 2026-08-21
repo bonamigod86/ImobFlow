@@ -9,17 +9,32 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Identity based on the imobFlow logo: emerald green accents (#12C58B)
+        // + deep navy text/heads (#0E1E52). Clean, light-touch brand palette.
         brand: {
-          50: "#eef2ff",
-          100: "#e0e7ff",
-          200: "#c7d2fe",
-          300: "#a5b4fc",
-          400: "#818cf8",
-          500: "#6366f1",
-          600: "#4f46e5",
-          700: "#4338ca",
-          800: "#3730a3",
-          900: "#312e81",
+          50: "#e9fbf4",
+          100: "#cdf8e7",
+          200: "#a0efd2",
+          300: "#66e2b8",
+          400: "#2fd39b",
+          500: "#12c58b",
+          600: "#0aa67a",
+          700: "#098563",
+          800: "#0b6952",
+          900: "#0a5744",
+        },
+        navy: {
+          50: "#eef1fb",
+          100: "#cdd6f1",
+          200: "#9aa8e0",
+          300: "#6a7ccc",
+          400: "#4153ad",
+          500: "#27378c",
+          600: "#182766",
+          700: "#12204f",
+          800: "#0e1e52",
+          900: "#0a1638",
+          950: "#03060f",
         },
         ink: {
           950: "#0f172a",

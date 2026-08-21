@@ -38,12 +38,13 @@ export default async function LandingPage() {
             <Image
               src="/images/imobFlow_logo.png"
               alt="ImobFlow"
-              width={96}
-              height={96}
-              className="mx-auto mb-4 h-20 w-20 object-contain"
+              width={160}
+              height={160}
+              priority
+              className="mx-auto mb-6 h-36 w-36 object-contain"
             />
             <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-brand-600">Portal de imóveis</p>
-            <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+            <h1 className="text-4xl font-bold tracking-tight text-navy-900 sm:text-5xl">
               Encontre o imóvel dos seus sonhos
             </h1>
             <p className="mt-4 text-lg text-slate-600">
@@ -89,7 +90,7 @@ export default async function LandingPage() {
         <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
           <div className="mb-6 flex items-end justify-between">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900">Imóveis em destaque</h2>
+              <h2 className="text-2xl font-bold tracking-tight text-navy-900">Imóveis em destaque</h2>
               <p className="mt-1 text-sm text-slate-500">Selecionados pelas imobiliárias parceiras.</p>
             </div>
             <Link href="/imoveis?featured=true" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">
@@ -108,7 +109,7 @@ export default async function LandingPage() {
       {cities.length > 0 && (
         <section className="border-y border-slate-200 bg-white">
           <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-            <h2 className="mb-6 text-2xl font-bold tracking-tight text-slate-900">Explore por cidade</h2>
+            <h2 className="mb-6 text-2xl font-bold tracking-tight text-navy-900">Explore por cidade</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {cities.map((c) => (
                 <Link
@@ -133,7 +134,7 @@ export default async function LandingPage() {
         <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
           <div className="mb-6 flex items-end justify-between">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900">Recém-chegados</h2>
+              <h2 className="text-2xl font-bold tracking-tight text-navy-900">Recém-chegados</h2>
               <p className="mt-1 text-sm text-slate-500">Os últimos imóveis publicados no portal.</p>
             </div>
             <Link href="/imoveis?sort=newest" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">
