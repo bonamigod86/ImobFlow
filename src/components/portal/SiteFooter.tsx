@@ -39,6 +39,9 @@ export function SiteFooter() {
             <li>
               <Link href="/login" className="hover:text-emerald-600">Portal do corretor</Link>
             </li>
+            <li>
+              <Link href="/cadastro" className="hover:text-emerald-600">Cadastre sua imobiliária ou corretor</Link>
+            </li>
           </ul>
         </nav>
       </div>
