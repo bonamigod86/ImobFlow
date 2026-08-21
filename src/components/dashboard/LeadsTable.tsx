@@ -235,7 +235,7 @@ export default function LeadsTable({
           value={solicitation}
           onChange={(e) => setSolicitation(e.target.value)}
           aria-label="Tipo de solicitação"
-          className="h-9 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+          className="h-9 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
         >
           <option value="">Toda solicitação</option>
           <option>Agendamento de Visita</option>
@@ -247,7 +247,7 @@ export default function LeadsTable({
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           aria-label="Situação"
-          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+          className="h-9 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
         >
           <option value="">Toda situação</option>
           <option value="NEW">Novo</option>

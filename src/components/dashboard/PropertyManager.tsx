@@ -183,7 +183,7 @@ export function PropertyManager({
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           aria-label="Situação"
-          className="h-9 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+          className="h-9 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
         >
           <option value="">Toda situação</option>
           {(Object.keys(STATUS_LABELS) as Array<keyof typeof STATUS_LABELS>).map((s) => (
@@ -194,7 +194,7 @@ export function PropertyManager({
           value={targetFilter}
           onChange={(e) => setTargetFilter(e.target.value)}
           aria-label="Tipo"
-          className="h-9 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+          className="h-9 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
         >
           <option value="">Tipo (venda/aluguel)</option>
           <option value="SALE">À venda</option>
@@ -205,7 +205,7 @@ export function PropertyManager({
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
           aria-label="Categoria"
-          className="h-9 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+          className="h-9 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
         >
           <option value="">Toda categoria</option>
           {(Object.keys(CATEGORY_LABELS) as Array<keyof typeof CATEGORY_LABELS>).map((c) => (
