@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Search, BadgeCheck, Building2, ShieldCheck, Zap } from "lucide-react";
+import { ArrowRight, BadgeCheck, Building2, ShieldCheck, Zap } from "lucide-react";
 import { listCities, listFeatured, listLatest } from "@/lib/public/repository";
 import { SITE_NAME } from "@/lib/public/seo";
 import { SiteHeader } from "@/components/portal/SiteHeader";
 import { SiteFooter } from "@/components/portal/SiteFooter";
 import { PropertyCard } from "@/components/portal/PropertyCard";
+import { HeroSearchForm } from "@/components/portal/HeroSearchForm";
 
 import { CATEGORY_SLUGS } from "@/lib/public/types";
 
@@ -33,6 +35,13 @@ export default async function LandingPage() {
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:py-24">
           <div className="mx-auto max-w-3xl text-center">
+            <Image
+              src="/images/imobFlow_logo.png"
+              alt="ImobFlow"
+              width={96}
+              height={96}
+              className="mx-auto mb-4 h-20 w-20 object-contain"
+            />
             <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-brand-600">Portal de imóveis</p>
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
               Encontre o imóvel dos seus sonhos
@@ -43,12 +52,13 @@ export default async function LandingPage() {
                 : "Apartamentos, casas, terrenos e salas comerciais à venda e para aluguel."}
             </p>
 
+            <HeroSearchForm />
+
             <Link
               href="/imoveis"
-              className="mt-8 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-brand-600/20 transition-colors hover:bg-brand-700"
+              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand-600 transition-colors hover:text-brand-700"
             >
-              <Search className="h-5 w-5" />
-              Explorar imóveis
+              Explorar todos os imóveis
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
