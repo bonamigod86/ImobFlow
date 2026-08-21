@@ -251,17 +251,21 @@ function MediaTile({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-1.5 border-t border-slate-100 p-2">
+      <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 p-2">
         {onPrimary && (
-          <Button size="sm" variant="secondary" className="flex-1" onClick={onPrimary}>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="whitespace-nowrap px-2.5 text-xs"
+            onClick={onPrimary}
+          >
             {primary ? <StarOff className="h-3.5 w-3.5" /> : <Star className="h-3.5 w-3.5" />}
             {primary ? "Remover capa" : "Tornar capa"}
           </Button>
         )}
         <Button
           size="sm"
-          variant="ghost"
-          className={onPrimary ? "text-red-600 hover:bg-red-50 hover:text-red-700" : "flex-1 text-red-600 hover:bg-red-50 hover:text-red-700"}
+          className="whitespace-nowrap bg-red-600 px-2.5 text-xs text-white hover:bg-red-700"
           onClick={onRemove}
         >
           <Trash2 className="h-3.5 w-3.5" />

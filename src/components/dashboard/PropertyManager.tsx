@@ -299,9 +299,9 @@ function PropertyCard({
           <Badge variant="secondary">{TARGET_LABELS[property.target]}</Badge>
         </div>
 
-        <div className="mt-4 flex items-center gap-1.5 border-t border-slate-100 pt-3">
+        <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">
           {canUpdate && (
-            <Button size="sm" variant="secondary" onClick={() => onAction({ kind: "edit", property })}>
+            <Button size="sm" variant="secondary" className="whitespace-nowrap" onClick={() => onAction({ kind: "edit", property })}>
               <Pencil className="h-3.5 w-3.5" />
               Editar
             </Button>
