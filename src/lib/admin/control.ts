@@ -2,6 +2,7 @@ import type { TenantStatus } from "@prisma/client";
 import { prismaUnscoped } from "@/lib/prisma/client";
 import { env } from "@/lib/config/env";
 import { getFinancialSnapshot } from "@/lib/billing/metrics";
+import { getPlatformInsights, type PlatformInsights } from "@/lib/admin/insights";
 import { QueueManager } from "@/lib/queues/queue-manager";
 import { DeadLetterQueue } from "@/lib/queues/dlq";
 import { QueueName, type QueueName as QueueNameType } from "@/lib/queues/names";
@@ -92,6 +93,21 @@ export interface MasterControlData {
   tenants: MasterTenantRow[];
   dunning: DunningRow[];
   audit: AuditRow[];
+  /** Checklist Item 16 — platform-wide KPI aggregation (clients/properties/leads/finance). */
+  insights: PlatformInsights;
+  /** Checklist Item 16/17 — financial snapshot surfaced for the master panels. */
+  finance: {
+    mrrCents: number;
+    periodRevenueCents: number;
+    pendingRevenueCents: number;
+    pastDueCount: number;
+    pastDueAmountCents: number;
+    blockedCount: number;
+    churnedSubscriptions: number;
+    churnRate: number;
+    revenueByPlan: Array<{ planCode: string; planName: string; mrrCents: number; activeSubscriptions: number }>;
+    subscriptionsByStatus: Array<{ status: TenantStatus; count: number }>;
+  };
 }
 
 const QUEUE_LIST: QueueNameType[] = [
@@ -152,6 +168,7 @@ export async function getMasterControlData(): Promise<MasterControlData> {
     health,
     queues,
     deliveryMetrics,
+    insights,
   ] = await Promise.all([
     // KPI revenue/MRR for the trailing 30 days.
     getFinancialSnapshot({ from: start, to: new Date(now) }),
@@ -205,6 +222,8 @@ export async function getMasterControlData(): Promise<MasterControlData> {
     loadHealth(),
     loadQueueMetrics(),
     loadDeliveryMetrics(),
+    // Checklist Item 16 — platform KPIs (clients/properties/leads).
+    getPlatformInsights({ from: start, to: new Date(now) }),
   ]);
 
   // Single-pass invoice aggregation (pending value + earliest due date).
@@ -297,6 +316,19 @@ export async function getMasterControlData(): Promise<MasterControlData> {
     tenants,
     dunning,
     audit,
+    insights,
+    finance: {
+      mrrCents: snapshot.mrrCents,
+      periodRevenueCents: snapshot.periodRevenueCents,
+      pendingRevenueCents: snapshot.pendingRevenueCents,
+      pastDueCount: snapshot.pastDueCount,
+      pastDueAmountCents: snapshot.pastDueAmountCents,
+      blockedCount: snapshot.blockedCount,
+      churnedSubscriptions: snapshot.churnedSubscriptions,
+      churnRate: snapshot.churnRate,
+      revenueByPlan: snapshot.revenueByPlan,
+      subscriptionsByStatus: snapshot.subscriptionsByStatus,
+    },
   };
 }
 

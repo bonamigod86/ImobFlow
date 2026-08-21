@@ -669,6 +669,54 @@ modelo padrão embutido.
 
 ---
 
+## Item 16 — Painel Master / Administrador
+
+Status: **100% implementado**. O painel executivo (`/admin/dashboard`) ganhou uma
+seção de KPIs de plataforma que agrega Clientes, Imóveis, Leads e Financeiro num
+único `GET /api/admin/control` (via `src/lib/admin/insights.ts` +
+`getFinancialSnapshot`).
+
+| Métrica | Disponibilizada |
+|---------|-----------------|
+| Clientes: total (imobiliárias × corretores), ativos/pagantes, trials, pendentes, vencidos, bloqueados, cancelados, novos no período | `insights.clients` (`byType` + `byStatus` + `count createdAt ≥ período`) |
+| Imóveis: total, ativos, novos, vendidos, alugados, inativos e destaques | `insights.properties` (`property.groupBy` + `propertyHighlight.count` ativos) |
+| Leads: total, imobiliários, financeiros (produtos/serviços adicionais), encaminhados a sistemas externos, por cidade, por imobiliária, por período e taxas de conversão | `insights.leads` (tipagem por `type`, `webhookDelivery` DELIVERED, agregação por `payload.city`/`financeProfile.city` e por tenant, `conversion.qualifiedRate/financialRate`) |
+| Financeiro: MRR, receita por período, pagamentos recebidos, pendentes, inadimplência, cancelamentos e planos mais contratados | `control.finance` (do `getFinancialSnapshot`) |
+
+Implementação: `src/lib/admin/insights.ts` (`getPlatformInsights`), novos campos
+`insights`/`finance` no `MasterControlData` e o widget
+`src/components/admin/master/PlatformMetrics.tsx` renderizado no `MasterDashboard`.
+
+## Item 17 — Gestão financeira
+
+Status: **100% implementado**. Visão operacional completa (não contábil) das
+assinaturas com filtros e exportação, em `/admin/financial`
+(`src/lib/admin/finance.ts` + `FinancialAdminConsole`).
+
+| Requisito | Implementação |
+|-----------|---------------|
+| Cliente, plano, valor, status | colunas da tabela de assinaturas (tenant + subscription + plan) |
+| Data da contratação, último pagamento, próximo vencimento | `createdAt`, `lastPaymentAt`, `nextInvoiceDueAt` do subscription |
+| Histórico + pagamentos aprovados/vencidos/em aberto | `paymentInvoice.groupBy(tenantId,status)` → `history.{paid,invoices,overdue,open,paidCents,overdueCents,openCents}` |
+| Bloqueios e cancelamentos | `blockedAt`/`cancelledAt` (e status) |
+| Filtros | status, plano, busca (nome/slug), período `from/to` |
+| Exportação | `GET /api/admin/financial/export` → CSV pt-BR (separador `;`, UTF-8 com BOM, Excel) com os mesmos filtros |
+| Endpoints | `GET /api/admin/financial/tenants` (lista + totais por status + opções de plano) e `/export` (CSV) |
+
+### Testes/smoke realizados (Itens 16/17)
+
+1. `src/lib/admin/finance.test.ts` — mapeamento tenant→fatura (resumo de
+   aprovadas/vencidas/em aberto), filtro de status na relação e formatação do CSV.
+2. `src/lib/admin/insights.test.ts` — agregação de clientes/imóveis/leads,
+   distribuição por cidade/imobiliária e taxas de conversão.
+3. Prova em processo fresco (base real): `getPayableSubscriptions` → 3 assinantes
+   com histórico resumido + `subscriptionsToCsv` gerando CSV com cabeçalho;
+   `getPlatformInsights` → 3 clientes (2 imobiliárias/1 corretor), 18 imóveis,
+   17 leads (14 imobiliários/3 financeiros, taxa 17,6%).
+4. `npx tsc --noEmit` limpo, `next lint` limpo, `vitest run` **231/231**.
+
+---
+
 ## Correções aplicadas após a auditoria (Item 5)
 
 1. **Duplicar conflitava no `externalCode`** — `duplicateProperty` copiava o
@@ -764,7 +812,7 @@ modelo padrão embutido.
 
 - `npx tsc --noEmit` — sem erros
 - `next lint` — sem warnings ou erros
-- `vitest run` — 227/227 testes passando
+- `vitest run` — 231/231 testes passando
 - Testes de segregação de dados (tenant A nunca lê dados de B) — verdes,
   incluindo as rotas públicas de itens 3 e 4
 - Seed demo: KPIs do painel populados (views, visitas, WhatsApp) de forma idempotente
@@ -790,4 +838,7 @@ modelo padrão embutido.
 - Item 15 (e-mails transacionais): 14 cenários cobertos (boas-vindas, ativação,
   senha, assinatura, pagamento, vencimento próximo, atraso, último aviso,
   bloqueio, reativação, cancelamento, lead, visita) com transports
-  resend/sendgrid/ses/console e templates administráveis com `{{variáveis}}
+  resend/sendgrid/ses/console e templates administráveis com `{{variáveis}}`
+- Itens 16/17 (Painel Master + Gestão financeira): painel executivo com KPIs de
+  clientes/imóveis/leads/financeiro e a gestão financeira das assinaturas com
+  filtros e exportação CSV validados com o pipeline real (base de dados dev)

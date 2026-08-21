@@ -7,6 +7,7 @@ import { RefreshCw, ExternalLink, Loader2, ShieldCheck } from "lucide-react";
 import { getJson } from "./api";
 import { ActionDialog, type DialogAction } from "./ActionDialog";
 import { KpiCards } from "./KpiCards";
+import { PlatformMetrics } from "./PlatformMetrics";
 import { HealthStrip } from "./HealthStrip";
 import { TenantTable } from "./TenantTable";
 import { DunningWidget } from "./DunningWidget";
@@ -114,6 +115,8 @@ export default function MasterDashboard({ user }: MasterDashboardProps) {
             totalTenants={control.tenants.length}
             leadsThisMonth={control.kpi.leadsThisMonth}
           />
+
+          <PlatformMetrics insights={control.insights} finance={control.finance} />
 
           <TenantTable tenants={control.tenants} busy={busy} onAction={handleAction} />
 

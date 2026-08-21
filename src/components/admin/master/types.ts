@@ -1,6 +1,21 @@
 import type { TenantStatus } from "@prisma/client";
+import type { PlatformInsights } from "@/lib/admin/insights";
 
 export type { TenantStatus };
+export type { PlatformInsights };
+
+export interface FinanceMetrics {
+  mrrCents: number;
+  periodRevenueCents: number;
+  pendingRevenueCents: number;
+  pastDueCount: number;
+  pastDueAmountCents: number;
+  blockedCount: number;
+  churnedSubscriptions: number;
+  churnRate: number;
+  revenueByPlan: Array<{ planCode: string; planName: string; mrrCents: number; activeSubscriptions: number }>;
+  subscriptionsByStatus: Array<{ status: TenantStatus; count: number }>;
+}
 
 export interface QueueCounts {
   waiting: number;
@@ -73,6 +88,8 @@ export interface ControlData {
   tenants: TenantRow[];
   dunning: DunningRow[];
   audit: AuditRow[];
+  insights: PlatformInsights;
+  finance: FinanceMetrics;
 }
 
 export interface PlanOption {
