@@ -86,6 +86,25 @@ export class TenantAdminService {
         : reason,
     });
 
+    // Distinct audit trail for manual account locks/unlocks (Item 24).
+    await AuditService.log({
+      tenantId,
+      userId: actorUserId,
+      action: blocking
+        ? AUDIT_ACTIONS.TENANT_MANUALLY_BLOCKED
+        : tenant.manualBlockedAt
+          ? AUDIT_ACTIONS.TENANT_MANUALLY_UNBLOCKED
+          : AUDIT_ACTIONS.TENANT_STATUS_CHANGED,
+      entity: "Tenant",
+      entityId: updated.id,
+      details: {
+        from: tenant.status,
+        to: newStatus,
+        reason: reason ?? null,
+        manualBlockedAt: blocking ? now.toISOString() : null,
+      },
+    });
+
     return updated;
   }
 

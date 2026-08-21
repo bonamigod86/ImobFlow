@@ -784,7 +784,7 @@ política de retenção; e rastreabilidade dos envios a sistemas externos.
   fora do tenant, retirada→anonimização, sweep de retenção).
 - Prova real: `getLeadPrivacy` de um lead da acme retornou consentimento
   (versão/finalidade) + 1 envio externo rastreado.
-- `npx tsc --noEmit` limpo, `next lint` limpo, `vitest run` **243/243**.
+- `npx tsc --noEmit` limpo, `next lint` limpo, `vitest run` **246/246**.
 
 ---
 
@@ -865,6 +865,36 @@ Open Graph e páginas indexáveis por cidade; performance via `next/image`.
 
 - Suítes `public/seo.test.ts` e `properties/seo.test.ts` (metadados, canonical, JSON-LD, slugs).
 - Sitemap/robots servidos nas rotas do app.
+
+---
+
+## Item 24 — Logs e auditoria
+
+Status: **100% implementado**. Toda operação crítica/administrativa persiste em
+`AuditLog` (via `AuditService`/eventos do barramento) com ator, tenant, entidade,
+`details` JSON, IP e timestamp — agora com **bloqueios/desbloqueios manuais,
+edição/desativação de planos auditados** e uma tela de consulta (Item 24).
+
+| # | Requisito | Status | Implementação |
+|---|-----------|--------|----------------|
+| 24.1 | Alterações de assinaturas | OK | `SUBSCRIPTION_PROVISIONED/PAST_DUE/BLOCKED/REACTIVATED/CANCELLED` (register.ts) |
+| 24.2 | Alterações de planos | OK (**novo**) | `PLAN_CREATED` (já), `PLAN_UPDATED` (PATCH) e `PLAN_DEACTIVATED` (toggle) |
+| 24.3 | Bloqueios/desbloqueios | OK (**novo**) | `TENANT_MANUALLY_BLOCKED`/`TENANT_MANUALLY_UNBLOCKED` emitidos em `changeStatus` (além de `TENANT_STATUS_CHANGED`) |
+| 24.4 | Operações financeiras administrativas | OK | `INVOICE_PAID`, `BILLING_EVENT_RECEIVED/FAILED`, `DUNNING_NOTIFIED`, `HIGHLIGHT_PURCHASED`, `PAYMENT_LINK_SENT`, auto-collect |
+| 24.5 | Exclusões | OK | `PROPERTY_DELETED`, `USER_DELETED`, `LEAD_DELETED`, `TENANT_*` |
+| 24.6 | Ações críticas | OK | `TENANT_IMPERSONATED`, `TENANT_STATUS_CHANGED`, `USER_*` (permissões), consentimento/anonimização |
+| 24.7 | Integrações | OK | `INTEGRATION_FAILED`, `ENDPOINT_CREATED/UPDATED/DEACTIVATED`, `ROUTING_RULE_*` |
+| 24.8 | Transmissão de leads | OK | `LEAD_ROUTED/DISPATCHED`, `WEBHOOK_DELIVERED` |
+| 24.9 | Falhas de integração | OK | `WEBHOOK_FAILED`, `INTEGRATION_FAILED`, `JOB_FAILED` |
+| 24.10 | Consulta de auditoria | OK (**novo**) | `GET /api/admin/audit` (MASTER, paginação + filtros por ação/entidade/tenant/ator/data) e console `/admin/audit` |
+
+### Testes/smoke (Item 24)
+
+- **novo** `src/lib/tenant/tenant-admin.test.ts` — emit de `TENANT_MANUALLY_BLOCKED/
+  UNBLOCKED` (e no-op sem status trocado).
+- Console `/admin/audit` lista `AuditLog` com filtros e paginação; trilha alimentada
+  por planos/assinaturas/bloqueios/leads/integrações.
+- `npx tsc --noEmit` limpo, `next lint` limpo, `vitest run` **246/246**.
 
 ---
 
@@ -963,7 +993,7 @@ Open Graph e páginas indexáveis por cidade; performance via `next/image`.
 
 - `npx tsc --noEmit` — sem erros
 - `next lint` — sem warnings ou erros
-- `vitest run` — 243/243 testes passando
+- `vitest run` — 246/246 testes passando
 - Testes de segregação de dados (tenant A nunca lê dados de B) — verdes,
   incluindo as rotas públicas de itens 3 e 4
 - Seed demo: KPIs do painel populados (views, visitas, WhatsApp) de forma idempotente
