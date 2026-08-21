@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Loader2, Plus, Save } from "lucide-react";
+import { Images, Loader2, Plus, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import type { PropertyRow } from "@/components/dashboard/types";
 import { CATEGORY_LABELS } from "@/lib/public/types";
+import { MediaManagerDialog } from "@/components/dashboard/MediaManagerDialog";
 import { STATUS_LABELS, TARGET_LABELS } from "@/components/dashboard/format";
 import type { PropertyAction } from "@/components/dashboard/PropertyDialogs";
 
@@ -114,11 +115,14 @@ export function FormDialog({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Target for the gallery (set on create success or via the edit shortcut).
+  const [mediaFor, setMediaFor] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
     setBusy(false);
+    setMediaFor(null);
     if (editing) {
       setForm({
         code: editing.code,
@@ -216,6 +220,12 @@ export function FormDialog({
       if (!res.ok) throw new Error(body.message ?? (editing ? "Falha ao salvar o imóvel." : "Falha ao criar o imóvel."));
       onSaved();
       onClose();
+
+      // Cadastro: logo após criar, abre o gerenciador de fotos para subir a
+      // imagem principal e as demais fotos do imóvel recém-criado.
+      if (!editing && body.property?.id) {
+        setMediaFor({ id: body.property.id as string, title: (body.property.title as string) ?? form.title });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao salvar o imóvel.");
     } finally {
@@ -224,6 +234,7 @@ export function FormDialog({
   }
 
   return (
+    <>
     <Dialog
       open={open}
       onOpenChange={(next) => {
@@ -472,6 +483,17 @@ export function FormDialog({
         )}
 
         <DialogFooter className="gap-2">
+          {editing && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mr-auto"
+              onClick={() => setMediaFor({ id: editing.id, title: editing.title })}
+            >
+              <Images className="h-4 w-4" />
+              Fotos do imóvel
+            </Button>
+          )}
           <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>
             Cancelar
           </Button>
@@ -480,8 +502,15 @@ export function FormDialog({
             {editing ? "Salvar alterações" : "Criar imóvel"}
           </Button>
         </DialogFooter>
-      </DialogContent>
+        </DialogContent>
     </Dialog>
+
+      <MediaManagerDialog
+        property={mediaFor ? (mediaFor as unknown as PropertyRow) : null}
+        onClose={() => setMediaFor(null)}
+        onChanged={onSaved}
+      />
+    </>
   );
 }
 
