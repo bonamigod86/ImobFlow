@@ -1,47 +1,44 @@
 "use client";
 
-import type { ReactNode } from "react";
 import {
   Building2,
-  Eye,
   Users,
-  MousePointerClick,
+  Eye,
+  MessageCircle,
   ArrowUpRight,
   ArrowDownRight,
   Minus,
   Sparkles,
   CalendarClock,
-  MessageCircle,
   BadgeCheck,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatBRL } from "@/lib/public/format";
-import type { DashboardSnapshot, PropertyStatus, StatusCounts } from "@/components/dashboard/types";
+import type { DashboardSnapshot, StatusCounts } from "@/components/dashboard/types";
 import {
-  STATUS_LABELS,
-  STATUS_BADGE_VARIANTS,
   TENANT_STATUS_LABELS,
   TENANT_STATUS_VARIANTS,
   formatCount,
   formatDate,
   usagePercent,
-  usageTone,
-  deltaPct,
 } from "@/components/dashboard/format";
-import { cn } from "@/lib/utils";
 
 interface MetricsGridProps {
   snapshot: DashboardSnapshot | null;
   counts: StatusCounts;
 }
 
+/**
+ * Executive KPI grid — clean 4-column Light layout (Stripe/Linear style):
+ * Imóveis ativos + quota · Leads do mês + conversão · Visitas & engajamento ·
+ * Plano & assinatura.
+ */
 export function MetricsGrid({ snapshot, counts }: MetricsGridProps) {
   if (!snapshot) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Skeleton className="h-40" />
         <Skeleton className="h-40" />
         <Skeleton className="h-40" />
@@ -50,305 +47,169 @@ export function MetricsGrid({ snapshot, counts }: MetricsGridProps) {
     );
   }
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <ActivePropertiesCard counts={counts} />
-      <PlanQuotaCard snapshot={snapshot} />
-      <LeadPipelineCard snapshot={snapshot} />
-      <ViewsCard snapshot={snapshot} />
-      <VisitsCard snapshot={snapshot} />
-      <WhatsAppCard snapshot={snapshot} />
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <ActivePropertiesCard counts={counts} snapshot={snapshot} />
+      <LeadsCard snapshot={snapshot} />
+      <EngagementCard snapshot={snapshot} />
+      <PlanCard snapshot={snapshot} />
     </div>
   );
 }
 
-function ActivePropertiesCard({ counts }: { counts: StatusCounts }) {
-  const statuses: PropertyStatus[] = ["ACTIVE", "INACTIVE", "SOLD", "RENTED"];
+// --- Card 1 · Imóveis ativos + quota ---------------------------------------
+function ActivePropertiesCard({ counts, snapshot }: { counts: StatusCounts; snapshot: DashboardSnapshot }) {
+  const util = snapshot.utilization;
+  const pct = util ? usagePercent(util.usedProperties, util.maxProperties) : null;
+  const maxLabel = util ? (util.maxProperties === null ? "Ilimitado" : formatCount(util.maxProperties)) : null;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-brand-400" />
+          <Building2 className="h-4 w-4 text-slate-400" />
           Imóveis ativos
         </CardTitle>
-        <CardDescription>Estado atual do portfólio</CardDescription>
+        <CardDescription>Situação atual do portfólio</CardDescription>
       </CardHeader>
       <CardContent>
-        <p className="text-3xl font-semibold tabular-nums tracking-tight text-ink-50">{formatCount(counts.ACTIVE)}</p>
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {statuses.map((status) => (
-            <Badge key={status} variant={STATUS_BADGE_VARIANTS[status]}>
-              {STATUS_LABELS[status]} · {formatCount(counts[status])}
-            </Badge>
-          ))}
+        <p className="text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums">
+          {formatCount(counts.ACTIVE)}
+        </p>
+        {util && (
+          <div className="mt-4 space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-xs font-medium text-slate-500">Uso da quota</span>
+              <span className="tabular-nums text-slate-500">
+                {formatCount(util.usedProperties)} de {maxLabel}
+                {pct !== null ? ` · ${pct}%` : ""}
+              </span>
+            </div>
+            {pct === null ? (
+              <div className="h-2 rounded-full bg-slate-200" />
+            ) : (
+              <Progress value={pct} />
+            )}
+          </div>
+        )}
+        <Badge variant="success" className="mt-4">{formatCount(counts.ACTIVE)} ativos</Badge>
+      </CardContent>
+    </Card>
+  );
+}
+
+// --- Card 2 · Leads do mês + conversão --------------------------------------
+function LeadsCard({ snapshot }: { snapshot: DashboardSnapshot }) {
+  const trend = deltaInfo(snapshot.leads7d, snapshot.leads30d);
+  const conv = Math.round(snapshot.conversion30d * 100);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-slate-400" />
+          Leads do mês
+        </CardTitle>
+        <CardDescription>Captura nos últimos 30 dias</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-baseline gap-3">
+          <p className="text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums">
+            {formatCount(snapshot.leads30d)}
+          </p>
+          <DeltaBadge delta={trend.delta} pct={trend.pct} />
+        </div>
+        <p className="mt-1 text-xs font-medium text-slate-500">
+          {formatCount(snapshot.leads7d)} nos últimos 7 dias
+        </p>
+        <div className="mt-4 flex items-center justify-between rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2">
+          <span className="text-xs font-medium text-slate-500">Taxa de conversão</span>
+          <span className="text-lg font-extrabold text-slate-900 tabular-nums">{conv}%</span>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function PlanQuotaCard({ snapshot }: { snapshot: DashboardSnapshot }) {
-  const { utilization } = snapshot;
-  if (!utilization) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Utilização do plano</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-ink-300">Plano não disponível no contexto atual.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-  const subscription = snapshot.subscription;
-  const rows: Array<{
-    label: string;
-    used: number;
-    max: number | null;
-    icon: ReactNode;
-  }> = [
-    { label: "Imóveis", used: utilization.usedProperties, max: utilization.maxProperties, icon: <Building2 className="h-4 w-4 text-brand-400" /> },
-    { label: "Usuários", used: utilization.usedUsers, max: utilization.maxUsers, icon: <Users className="h-4 w-4 text-sky-400" /> },
-    { label: "Leads/mês", used: utilization.usedLeads, max: utilization.maxLeads, icon: <MousePointerClick className="h-4 w-4 text-emerald-400" /> },
-    { label: "Destaques", used: utilization.usedHighlights, max: utilization.maxHighlights, icon: <Sparkles className="h-4 w-4 text-amber-400" /> },
-  ];
+// --- Card 3 · Visitas & engajamento ------------------------------------------
+function EngagementCard({ snapshot }: { snapshot: DashboardSnapshot }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <GaugeDot />
-          Plano e utilização
+          <Eye className="h-4 w-4 text-slate-400" />
+          Visitas & engajamento
         </CardTitle>
-        <CardDescription className="flex items-center gap-2">
-          {utilization.planName}
-          <Badge variant="secondary" className="font-mono uppercase">{utilization.planCode}</Badge>
-          {subscription && (
-            <Badge variant={TENANT_STATUS_VARIANTS[subscription.status]}>
-              {TENANT_STATUS_LABELS[subscription.status]}
+        <CardDescription>Últimos 30 dias</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <Eye className="h-4 w-4" /> Visualizações de imóveis
+          </span>
+          <span className="text-xl font-extrabold text-slate-900 tabular-nums">{formatCount(snapshot.views30d)}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <MessageCircle className="h-4 w-4" /> Cliques no WhatsApp
+          </span>
+          <span className="text-xl font-extrabold text-slate-900 tabular-nums">{formatCount(snapshot.whatsapp30d)}</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// --- Card 4 · Plano & assinatura --------------------------------------------
+function PlanCard({ snapshot }: { snapshot: DashboardSnapshot }) {
+  const util = snapshot.utilization;
+  const sub = snapshot.subscription;
+  const planName = util?.planName ?? "—";
+  const status = sub?.status ?? null;
+  const nextDue = sub?.nextInvoiceDueAt || sub?.currentPeriodEnd || null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <BadgeCheck className="h-4 w-4 text-slate-400" />
+          Plano & assinatura
+        </CardTitle>
+        <CardDescription>Contrato vigente</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xl font-extrabold tracking-tight text-slate-900">{planName}</p>
+          {status && (
+            <Badge variant={status === "ACTIVE" ? "success" : TENANT_STATUS_VARIANTS[status]}>
+              {TENANT_STATUS_LABELS[status]}
             </Badge>
           )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-3">
-          {rows.map((row) => {
-            const pct = usagePercent(row.used, row.max);
-            const maxLabel = row.max === null ? "Ilimitado" : formatCount(row.max);
-            return (
-              <div key={row.label} className="space-y-1.5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2 text-sm text-ink-200">
-                    {row.icon}
-                    {row.label}
-                  </span>
-                  <span className="text-xs tabular-nums text-ink-300">
-                    {formatCount(row.used)} de {maxLabel}
-                    {pct !== null && <span className="ml-1 text-ink-400">({pct}%)</span>}
-                  </span>
-                </div>
-                {pct === null ? (
-                  <div className="h-2 rounded-full bg-ink-700" />
-                ) : (
-                  <Progress value={pct} indicatorClassName={usageTone(pct)} />
-                )}
-              </div>
-            );
-          })}
         </div>
-
-        {subscription && (
-          <div className="space-y-2 rounded-lg border border-ink-700 bg-ink-950/40 px-3 py-2.5 text-xs text-ink-300">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-ink-400">
-                <BadgeCheck className="h-3.5 w-3.5" />
-                Assinatura
-              </span>
-              <span className="font-medium text-ink-100">
-                {formatBRL(String(subscription.priceCents / 100), { compact: true })}
-                <span className="text-ink-400">/{subscription.billingCycle === "YEARLY" ? "ano" : "mês"}</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-ink-400">Próximo vencimento</span>
-              <span className="tabular-nums text-ink-100">{formatDate(subscription.nextInvoiceDueAt || subscription.currentPeriodEnd)}</span>
-            </div>
-            {subscription.status === "TRIAL" && subscription.trialEndsAt && (
-              <div className="flex items-center justify-between">
-                <span className="text-ink-400">Fim da avaliação</span>
-                <span className="tabular-nums text-ink-100">{formatDate(subscription.trialEndsAt)}</span>
-              </div>
-            )}
-            {utilization.maxHighlights != null && (
-              <div className="flex items-center justify-between">
-                <span className="text-ink-400">Créditos de destaque</span>
-                <span className="tabular-nums text-ink-100">{formatCount(utilization.highlightBalance)} disponíveis</span>
-              </div>
-            )}
-          </div>
+        <div className="mt-4 flex items-center justify-between rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+            <CalendarClock className="h-4 w-4" /> Próximo vencimento
+          </span>
+          <span className="text-sm font-semibold text-slate-900 tabular-nums">{nextDue ? formatDate(nextDue) : "—"}</span>
+        </div>
+        {sub?.trialEndsAt && sub.status === "TRIAL" && (
+          <p className="mt-2 text-xs font-medium text-slate-500">Fim da avaliação: {formatDate(sub.trialEndsAt)}</p>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function GaugeDot() {
-  // Tiny radial glyph reused as the plan card accent.
-  return (
-    <span className="flex h-4 w-4 items-center justify-center rounded-full border border-brand-500/40 bg-brand-500/15">
-      <Sparkles className="h-2.5 w-2.5 text-brand-300" />
-    </span>
-  );
-}
-
-function LeadPipelineCard({ snapshot }: { snapshot: DashboardSnapshot }) {
-  const trend = deltaPct(snapshot.leads7d, snapshot.leads30d);
-  const conv30 = Math.round(snapshot.conversion30d * 100);
-  const conv7 = Math.round(snapshot.conversion7d * 100);
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MousePointerClick className="h-4 w-4 text-emerald-400" />
-          Funil de leads
-        </CardTitle>
-        <CardDescription>Captura nos últimos 30 dias</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-baseline gap-2">
-          <p className="text-3xl font-semibold tabular-nums tracking-tight text-ink-50">
-            {formatCount(snapshot.leads30d)}
-          </p>
-          <DeltaBadge delta={trend.delta} pct={trend.pct} />
-        </div>
-        <p className="mt-1 text-sm text-ink-300">
-          <span className="text-ink-100">{formatCount(snapshot.leads7d)}</span> nos últimos 7 dias
-        </p>
-        <div className="mt-4 flex items-center justify-between rounded-lg border border-ink-700 bg-ink-950/40 px-3 py-2">
-          <span className="text-xs text-ink-400">Conversão</span>
-          <span className="flex items-center gap-2 text-sm tabular-nums">
-            <span className="font-medium text-ink-100">{conv30}%</span>
-            <span className="text-xs text-ink-400">7d: {conv7}%</span>
-            <ConversionDot current={conv7} previous={conv30} />
-          </span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ViewsCard({ snapshot }: { snapshot: DashboardSnapshot }) {
-  const trend = deltaPct(snapshot.views7d, snapshot.views30d);
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Eye className="h-4 w-4 text-sky-400" />
-          Visitas ao portal
-        </CardTitle>
-        <CardDescription>Visualizações de imóveis</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-baseline gap-2">
-          <p className="text-3xl font-semibold tabular-nums tracking-tight text-ink-50">
-            {formatCount(snapshot.views30d)}
-          </p>
-          <DeltaBadge delta={trend.delta} pct={trend.pct} />
-        </div>
-        <p className="mt-1 text-sm text-ink-300">
-          <span className="text-ink-100">{formatCount(snapshot.views7d)}</span> nos últimos 7 dias
-        </p>
-        <div className="mt-4">
-          <div className="flex items-center justify-between text-xs text-ink-400">
-            <span>Ritmo semanal</span>
-            <span className="tabular-nums">{formatCount(snapshot.views7d)} / 7d</span>
-          </div>
-          <Bars7vs30 current7d={snapshot.views7d} total30d={snapshot.views30d} />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function VisitsCard({ snapshot }: { snapshot: DashboardSnapshot }) {
-  const trend = deltaPct(snapshot.visits7d, snapshot.visits30d);
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CalendarClock className="h-4 w-4 text-violet-400" />
-          Visitas solicitadas
-        </CardTitle>
-        <CardDescription>Interessados que agendaram visita</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-baseline gap-2">
-          <p className="text-3xl font-semibold tabular-nums tracking-tight text-ink-50">
-            {formatCount(snapshot.visits30d)}
-          </p>
-          <DeltaBadge delta={trend.delta} pct={trend.pct} />
-        </div>
-        <p className="mt-1 text-sm text-ink-300">
-          <span className="text-ink-100">{formatCount(snapshot.visits7d)}</span> nos últimos 7 dias
-        </p>
-        <p className="mt-4 rounded-lg border border-ink-700 bg-ink-950/40 px-3 py-2 text-xs text-ink-400">
-          Leads com data/horário agendado (solicitações de visita).
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function WhatsAppCard({ snapshot }: { snapshot: DashboardSnapshot }) {
-  const trend = deltaPct(snapshot.whatsapp7d, snapshot.whatsapp30d);
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MessageCircle className="h-4 w-4 text-[#25D366]" />
-          Contatos por WhatsApp
-        </CardTitle>
-        <CardDescription>Cliques no botão de conversa</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-baseline gap-2">
-          <p className="text-3xl font-semibold tabular-nums tracking-tight text-ink-50">
-            {formatCount(snapshot.whatsapp30d)}
-          </p>
-          <DeltaBadge delta={trend.delta} pct={trend.pct} />
-        </div>
-        <p className="mt-1 text-sm text-ink-300">
-          <span className="text-ink-100">{formatCount(snapshot.whatsapp7d)}</span> nos últimos 7 dias
-        </p>
-        <p className="mt-4 rounded-lg border border-ink-700 bg-ink-950/40 px-3 py-2 text-xs text-ink-400">
-          Visitantes que iniciaram conversa para este imóvel.
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Mini bar comparing the last 7d against the expected weekly share of the 30d total. */
-function Bars7vs30({ current7d, total30d }: { current7d: number; total30d: number }) {
-  const weeklyShare = Math.max(0, Math.round(total30d - current7d) / 3);
-  const maxVal = Math.max(1, current7d, weeklyShare);
-  return (
-    <div className="mt-2 flex h-10 items-end gap-2">
-      <div
-        className="relative flex-1 rounded-t-md bg-brand-500/80"
-        style={{ height: `${Math.max(4, (current7d / maxVal) * 100)}%` }}
-        title={`Últimos 7 dias: ${current7d}`}
-      />
-      <div
-        className="flex-1 rounded-t-md bg-ink-600"
-        style={{ height: `${Math.max(4, (weeklyShare / maxVal) * 100)}%` }}
-        title={`Média das 3 semanas anteriores: ${Math.round(weeklyShare)}`}
-      />
-    </div>
-  );
+function deltaInfo(current7d: number, total30d: number): { delta: "up" | "down" | "flat" | "new" | null; pct: number | null } {
+  if (total30d <= 0) return { delta: current7d > 0 ? "new" : "flat", pct: null };
+  const previous = Math.max(0, total30d - current7d) / 3;
+  if (previous <= 0) return { delta: "new", pct: null };
+  const pct = Math.round(((current7d - previous) / previous) * 100);
+  if (pct > 0) return { delta: "up", pct };
+  if (pct < 0) return { delta: "down", pct };
+  return { delta: "flat", pct: 0 };
 }
 
 function DeltaBadge({ delta, pct }: { delta: "up" | "down" | "flat" | "new" | null; pct: number | null }) {
-  if (delta === null) return null;
+  if (!delta) return null;
   if (delta === "new") {
     return (
       <Badge variant="info">
@@ -363,18 +224,5 @@ function DeltaBadge({ delta, pct }: { delta: "up" | "down" | "flat" | "new" | nu
       <Icon className="h-3 w-3" />
       {pct !== null ? `${pct > 0 ? "+" : ""}${pct}%` : "—"}
     </Badge>
-  );
-}
-
-function ConversionDot({ current, previous }: { current: number; previous: number }) {
-  const cls = cn(
-    "inline-flex h-4 w-4 items-center justify-center rounded-full text-[0.6rem] font-bold",
-    current > previous ? "bg-emerald-500/20 text-emerald-300" : current < previous ? "bg-red-500/20 text-red-300" : "bg-ink-700 text-ink-300",
-  );
-  const Icon = current > previous ? ArrowUpRight : current < previous ? ArrowDownRight : Minus;
-  return (
-    <span className={cls} title={current > previous ? "Acima do período anterior" : current < previous ? "Abaixo do período anterior" : "Estável"}>
-      <Icon className="h-3 w-3" />
-    </span>
   );
 }

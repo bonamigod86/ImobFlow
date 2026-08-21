@@ -36,14 +36,19 @@ const config: Config = {
           900: "#0a1638",
           950: "#03060f",
         },
+        // Light-mode scale (Stripe/Linear): low numbers = dark text, high
+        // numbers = light surfaces. Keeps ink-*-based components light.
         ink: {
-          950: "#0f172a",
-          900: "#1e293b",
-          700: "#334155",
-          500: "#64748b",
-          300: "#cbd5e1",
-          100: "#f1f5f9",
-          50: "#f8fafc",
+          50: "#0f172a",
+          100: "#1e293b",
+          200: "#334155",
+          300: "#475569",
+          400: "#64748b",
+          500: "#94a3b8",
+          700: "#e2e8f0",
+          800: "#f1f5f9",
+          900: "#ffffff",
+          950: "#f8fafc",
         },
       },
       fontFamily: {

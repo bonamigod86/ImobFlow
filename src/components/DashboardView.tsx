@@ -183,15 +183,15 @@ const canDelete = actions.includes("properties:delete");
           </div>
 
           {/* Últimos Leads Recebidos — preview + link para a base completa */}
-          <div className="rounded-xl border border-ink-800 bg-ink-900/40 p-5">
+          <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="text-base font-semibold tracking-tight text-ink-50">Últimos leads recebidos</h2>
-                <p className="text-sm text-ink-400">Solicitações mais recentes dos visitantes do portal.</p>
+                <h2 className="text-base font-bold tracking-tight text-slate-900">Últimos leads recebidos</h2>
+                <p className="text-xs font-medium text-slate-500">Solicitações mais recentes dos visitantes do portal.</p>
               </div>
               <Link
                 href="/dashboard/leads"
-                className="inline-flex items-center gap-1 text-sm font-medium text-brand-400 transition-colors hover:text-brand-300"
+                className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 transition-colors hover:text-emerald-700"
               >
                 Ver base completa
                 <ArrowRight className="h-4 w-4" />
