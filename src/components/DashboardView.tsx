@@ -1,20 +1,18 @@
 "use client";
 
 import type { TenantStatus, UserRole } from "@prisma/client";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, RefreshCw } from "lucide-react";
+import { AlertTriangle, Plus, RefreshCw } from "lucide-react";
 import { useTenant } from "@/lib/tenant/tenant-client-context";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { PropertyManager } from "@/components/dashboard/PropertyManager";
-import { TopProperties } from "@/components/dashboard/TopProperties";
-import { TopLeads } from "@/components/dashboard/TopLeads";
 import LeadsTable from "@/components/dashboard/LeadsTable";
+import { TenantProfileForm } from "@/components/dashboard/TenantProfileForm";
 import { PlatformEmptyState } from "@/components/dashboard/PlatformEmptyState";
-import type { DashboardSnapshot, PropertyRow, StatusCounts, TopPropertyView } from "@/components/dashboard/types";
-import { priceForRow } from "@/components/dashboard/format";
+import type { DashboardSnapshot, PropertyRow, StatusCounts } from "@/components/dashboard/types";
 
 interface DashboardViewProps {
   user: { name: string; email: string; role: UserRole };
@@ -38,20 +36,20 @@ interface SnapshotEnvelope {
   error?: string;
 }
 
+type DashboardTab = "overview" | "properties" | "leads" | "profile";
+
 /**
- * Tenant dashboard — executive layout. KPI cards, plan-quota progress,
- * lead/engagement windows, an editable property table and the top-3
- * engagements. Raw RBAC/JWT debug output lives behind the "developer
- * details" dialog only. Data is tenant-scoped via the API layer; the
- * platform view (MASTER, no tenant) renders an empty state instead.
+ * Tenant dashboard — tabbed workspace: Início (executive overview), Imóveis
+ * (property cards), Leads (management table) and Perfil (self-service).
  */
 export default function DashboardView({ user, tenant, actions }: DashboardViewProps) {
   const { slug: clientSlug, role: clientRole } = useTenant();
   const [load, setLoad] = useState<LoadStatus>({ status: "loading" });
+  const [tab, setTab] = useState<DashboardTab>("overview");
 
-const canCreate = actions.includes("properties:create");
-const canUpdate = actions.includes("properties:update");
-const canDelete = actions.includes("properties:delete");
+  const canCreate = actions.includes("properties:create");
+  const canUpdate = actions.includes("properties:update");
+  const canDelete = actions.includes("properties:delete");
 
   const refresh = useCallback(async () => {
     if (!tenant) return;
@@ -92,52 +90,6 @@ const canDelete = actions.includes("properties:delete");
     return result;
   }, [load]);
 
-  const rowsById = useMemo(() => {
-    const map = new Map<string, PropertyRow>();
-    if (load.status === "ready") for (const row of load.rows) map.set(row.id, row);
-    return map;
-  }, [load]);
-
-  const topProperties: TopPropertyView[] = useMemo(() => {
-    if (load.status !== "ready" || !load.snapshot) return [];
-    return load.snapshot.topProperties.slice(0, 3).map((item) => {
-      const property = rowsById.get(item.id);
-      return {
-        id: item.id,
-        code: item.code,
-        title: item.title,
-        views7d: item.views7d,
-        leads7d: item.leads7d,
-        leads30d: item.leads30d,
-        conversionRate: item.conversionRate,
-        slug: property?.slug ?? null,
-        coverImage: property?.coverImage ?? null,
-        category: property?.category ?? "OTHER",
-        priceLabel: property ? priceForRow(property) : undefined,
-      };
-    });
-  }, [load, rowsById]);
-
-  const topByLeads: TopPropertyView[] = useMemo(() => {
-    if (load.status !== "ready" || !load.snapshot) return [];
-    return load.snapshot.topByLeads.slice(0, 5).map((item) => {
-      const property = rowsById.get(item.id);
-      return {
-        id: item.id,
-        code: item.code,
-        title: item.title,
-        views7d: item.views7d,
-        leads7d: item.leads7d,
-        leads30d: item.leads30d,
-        conversionRate: item.conversionRate,
-        slug: property?.slug ?? null,
-        coverImage: property?.coverImage ?? null,
-        category: property?.category ?? "OTHER",
-        priceLabel: property ? priceForRow(property) : undefined,
-      };
-    });
-  }, [load, rowsById]);
-
   const planName = load.status === "ready" ? load.snapshot?.utilization?.planName ?? null : null;
 
   return (
@@ -154,19 +106,33 @@ const canDelete = actions.includes("properties:delete");
       {!tenant ? (
         <PlatformEmptyState />
       ) : load.status === "error" ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-6 py-10 text-center">
-          <AlertTriangle className="h-6 w-6 text-red-300" />
-          <p className="max-w-md text-sm text-red-200">{load.message}</p>
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-6 py-10 text-center">
+          <AlertTriangle className="h-6 w-6 text-red-500" />
+          <p className="max-w-md text-sm text-red-700">{load.message}</p>
           <Button variant="outline" size="sm" onClick={() => void refresh()}>
             <RefreshCw className="h-4 w-4" />
             Tentar novamente
           </Button>
         </div>
       ) : (
-        <>
-          <MetricsGrid snapshot={load.status === "ready" ? load.snapshot : null} counts={counts} />
+        <Tabs value={tab} onValueChange={(v) => setTab(v as DashboardTab)}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="overview">Início</TabsTrigger>
+            <TabsTrigger value="properties">Imóveis</TabsTrigger>
+            <TabsTrigger value="leads">Leads</TabsTrigger>
+            <TabsTrigger value="profile">Gerenciar perfil</TabsTrigger>
+          </TabsList>
 
-          <div className="grid gap-6 lg:grid-cols-3">
+          <TabsContent value="overview" className="space-y-6">
+            <WelcomeStrip
+              name={user.name}
+              planName={planName}
+              onNewProperty={() => setTab("properties")}
+            />
+            <MetricsGrid snapshot={load.status === "ready" ? load.snapshot : null} counts={counts} />
+          </TabsContent>
+
+          <TabsContent value="properties">
             <PropertyManager
               rows={load.status === "ready" ? load.rows : []}
               total={load.status === "ready" ? load.total : 0}
@@ -176,31 +142,49 @@ const canDelete = actions.includes("properties:delete");
               canDelete={canDelete}
               onChanged={() => void refresh()}
             />
-            <div className="space-y-6">
-              <TopProperties top={topProperties} loading={load.status === "loading"} />
-              <TopLeads top={topByLeads} loading={load.status === "loading"} />
-            </div>
-          </div>
+          </TabsContent>
 
-          {/* Últimos Leads Recebidos — preview + link para a base completa */}
-          <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h2 className="text-base font-bold tracking-tight text-slate-900">Últimos leads recebidos</h2>
-                <p className="text-xs font-medium text-slate-500">Solicitações mais recentes dos visitantes do portal.</p>
-              </div>
-              <Link
-                href="/dashboard/leads"
-                className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 transition-colors hover:text-emerald-700"
-              >
-                Ver base completa
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-            <LeadsTable limit={5} showHeader={false} />
-          </div>
-        </>
+          <TabsContent value="leads">
+            <LeadsTable />
+          </TabsContent>
+
+          <TabsContent value="profile">
+            <TenantProfileForm />
+          </TabsContent>
+        </Tabs>
       )}
+    </div>
+  );
+}
+
+function WelcomeStrip({
+  name,
+  planName,
+  onNewProperty,
+}: {
+  name: string;
+  planName: string | null;
+  onNewProperty: () => void;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-slate-900 p-6 text-white shadow-md">
+      <div className="relative flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-100/80">Painel do assinante</p>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">Olá, {name.split(" ")[0]}</h2>
+          <p className="mt-1 text-sm text-emerald-50/90">
+            {planName ? `Plano ${planName}. ` : ""}Acompanhe seu portfólio, leads e métricas em um lugar só.
+          </p>
+        </div>
+        <Button
+          size="lg"
+          className="bg-white text-emerald-700 shadow-sm hover:bg-emerald-50"
+          onClick={onNewProperty}
+        >
+          <Plus className="h-4 w-4" />
+          Novo imóvel
+        </Button>
+      </div>
     </div>
   );
 }

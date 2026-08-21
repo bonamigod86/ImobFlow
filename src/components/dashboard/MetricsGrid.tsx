@@ -66,7 +66,9 @@ function ActivePropertiesCard({ counts, snapshot }: { counts: StatusCounts; snap
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-slate-400" />
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100">
+            <Building2 className="h-4 w-4 text-emerald-700" />
+          </span>
           Imóveis ativos
         </CardTitle>
         <CardDescription>Situação atual do portfólio</CardDescription>
@@ -105,7 +107,9 @@ function LeadsCard({ snapshot }: { snapshot: DashboardSnapshot }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-slate-400" />
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-100">
+            <Users className="h-4 w-4 text-sky-700" />
+          </span>
           Leads do mês
         </CardTitle>
         <CardDescription>Captura nos últimos 30 dias</CardDescription>
@@ -135,7 +139,9 @@ function EngagementCard({ snapshot }: { snapshot: DashboardSnapshot }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Eye className="h-4 w-4 text-slate-400" />
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100">
+            <Eye className="h-4 w-4 text-violet-700" />
+          </span>
           Visitas & engajamento
         </CardTitle>
         <CardDescription>Últimos 30 dias</CardDescription>
@@ -170,7 +176,9 @@ function PlanCard({ snapshot }: { snapshot: DashboardSnapshot }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <BadgeCheck className="h-4 w-4 text-slate-400" />
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100">
+            <BadgeCheck className="h-4 w-4 text-amber-700" />
+          </span>
           Plano & assinatura
         </CardTitle>
         <CardDescription>Contrato vigente</CardDescription>

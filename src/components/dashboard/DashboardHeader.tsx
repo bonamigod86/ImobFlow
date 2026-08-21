@@ -3,7 +3,6 @@
 import type { TenantStatus, UserRole } from "@prisma/client";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { DeveloperDetailsDialog } from "@/components/dashboard/DeveloperDetails";
 import SignOutButton from "@/components/SignOutButton";
 import { ROLE_LABELS, TENANT_STATUS_LABELS, TENANT_STATUS_VARIANTS } from "@/components/dashboard/format";
 
@@ -16,14 +15,7 @@ interface DashboardHeaderProps {
   clientRole: string | null;
 }
 
-export function DashboardHeader({
-  user,
-  tenant,
-  planName,
-  actions,
-  clientSlug,
-  clientRole,
-}: DashboardHeaderProps) {
+export function DashboardHeader({ user, tenant, planName }: DashboardHeaderProps) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
@@ -52,13 +44,6 @@ export function DashboardHeader({
         </div>
       </div>
       <div className="flex items-center gap-1.5">
-        <DeveloperDetailsDialog
-          user={user}
-          tenant={tenant}
-          actions={actions}
-          clientSlug={clientSlug}
-          clientRole={clientRole}
-        />
         <SignOutButton />
       </div>
     </div>

@@ -9,6 +9,7 @@ import {
   EyeOff,
   Images,
   Loader2,
+  MapPin,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -18,7 +19,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -27,14 +27,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { PropertyThumb } from "@/components/dashboard/PropertyThumb";
 import { PropertyDialogs, type PropertyAction } from "@/components/dashboard/PropertyDialogs";
 import type { PropertyRow } from "@/components/dashboard/types";
@@ -47,6 +39,13 @@ import {
   priceForRow,
 } from "@/components/dashboard/format";
 
+interface LifecycleActions {
+  duplicate(): Promise<void>;
+  toggleActive(): Promise<void>;
+  setStatus(status: "SOLD" | "RENTED"): Promise<void>;
+  toggleFeatured(): Promise<void>;
+}
+
 interface PropertyManagerProps {
   rows: PropertyRow[];
   loading: boolean;
@@ -57,6 +56,12 @@ interface PropertyManagerProps {
   onChanged: () => void;
 }
 
+/**
+ * Property portfolio as a responsive card grid (no horizontal scroll). Each
+ * card shows the cover, location, price and status with an "Editar" action plus
+ * a menu for the full lifecycle. Create/edit/media/delete run through the shared
+ * PropertyDialogs.
+ */
 export function PropertyManager({
   rows,
   loading,
@@ -124,13 +129,13 @@ export function PropertyManager({
   });
 
   return (
-    <Card className="lg:col-span-2">
-      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
-        <div className="space-y-1.5">
-          <CardTitle>Imóveis</CardTitle>
-          <CardDescription>
+    <div>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-slate-900">Imóveis</h2>
+          <p className="text-xs font-medium text-slate-500">
             {total > 0 ? `${formatCount(total)} ${total === 1 ? "imóvel cadastrado" : "imóveis cadastrados"}` : "Gestão do portfólio"}
-          </CardDescription>
+          </p>
         </div>
         {canCreate && (
           <Button size="sm" onClick={() => setAction({ kind: "new" })}>
@@ -138,174 +143,187 @@ export function PropertyManager({
             Novo imóvel
           </Button>
         )}
-      </CardHeader>
-      <CardContent>
-        {actionError && (
-          <p className="mb-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-            {actionError}
-          </p>
-        )}
-        {rows.length === 0 && !loading ? (
-          <div className="rounded-lg border border-dashed border-ink-700 px-4 py-10 text-center">
-            <p className="text-sm text-ink-300">Nenhum imóvel cadastrado ainda.</p>
-            {canCreate && (
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => setAction({ kind: "new" })}>
-                <Plus className="h-4 w-4" />
-                Cadastrar primeiro imóvel
-              </Button>
-            )}
-          </div>
-        ) : loading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10" />
-            <Skeleton className="h-12" />
-            <Skeleton className="h-12" />
-            <Skeleton className="h-12" />
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16">Imagem</TableHead>
-                <TableHead>Código e título</TableHead>
-                <TableHead className="hidden md:table-cell">Localização</TableHead>
-                <TableHead className="hidden lg:table-cell">Finalidade</TableHead>
-                <TableHead className="text-right">Preço</TableHead>
-                <TableHead>Situação</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((property) => {
-                const price = priceForRow(property);
-                const actions = lifecycle(property);
-                const busy = busyId === property.id;
-                return (
-                  <TableRow key={property.id}>
-                    <TableCell>
-                      <PropertyThumb
-                        url={property.coverImage}
-                        title={property.title}
-                        category={property.category}
-                        className="h-10 w-14"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="max-w-[13rem] truncate text-sm font-medium text-ink-100">{property.title}</span>
-                        <code className="font-mono text-xs text-ink-400">{property.code}</code>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <span className="max-w-[11rem] truncate text-sm text-ink-300">{locationForRow(property)}</span>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <Badge variant="secondary">{TARGET_LABELS[property.target]}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span className="whitespace-nowrap text-sm tabular-nums text-ink-100">
-                        {price.label}
-                        {price.period && <span className="ml-0.5 text-xs text-ink-400">{price.period}</span>}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_BADGE_VARIANTS[property.status]}>
-                        {STATUS_LABELS[property.status]}
-                      </Badge>
-                      {!property.isActive && (
-                        <Badge variant="outline" className="ml-1.5">Oculto</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-sm" aria-label={`Ações para ${property.title}`} disabled={busy}>
-                            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => setAction({ kind: "view", property })}>
-                            <Eye />
-                            Ver detalhes
-                          </DropdownMenuItem>
-                          {canUpdate && (
-                            <>
-                              <DropdownMenuItem onSelect={() => setAction({ kind: "edit", property })}>
-                                <Pencil />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => void actions.duplicate()}>
-                                <Copy />
-                                Duplicar
-                              </DropdownMenuItem>
-                              {property.isFeatured ? (
-                                <DropdownMenuItem onSelect={() => void actions.toggleFeatured()}>
-                                  <StarOff />
-                                  Remover destaque
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem onSelect={() => void actions.toggleFeatured()}>
-                                  <Star />
-                                  Destacar
-                                </DropdownMenuItem>
-                              )}
-                              {property.isActive ? (
-                                <DropdownMenuItem onSelect={() => void actions.toggleActive()}>
-                                  <EyeOff />
-                                  Desativar (ocultar)
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem onSelect={() => void actions.toggleActive()}>
-                                  <Eye />
-                                  Ativar (publicar)
-                                </DropdownMenuItem>
-                              )}
-                              {property.status !== "SOLD" && (
-                                <DropdownMenuItem onSelect={() => void actions.setStatus("SOLD")}>
-                                  <BadgeCheck />
-                                  Marcar vendido
-                                </DropdownMenuItem>
-                              )}
-                              {property.status !== "RENTED" && (
-                                <DropdownMenuItem onSelect={() => void actions.setStatus("RENTED")}>
-                                  <CalendarCheck />
-                                  Marcar alugado
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem onSelect={() => setAction({ kind: "media", property })}>
-                                <Images />
-                                Fotos e vídeos
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                          {canDelete && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-red-300 focus:bg-red-500/10 focus:text-red-200"
-                                onSelect={() => setAction({ kind: "delete", property })}
-                              >
-                                <Trash2 />
-                                Excluir
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
+      </div>
 
-      <PropertyDialogs
-        action={action}
-        onClose={() => setAction(null)}
-        onSaved={onChanged}
-      />
-    </Card>
+      {actionError && (
+        <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>
+      )}
+
+      {rows.length === 0 && !loading ? (
+        <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center">
+          <p className="text-sm text-slate-500">Nenhum imóvel cadastrado ainda.</p>
+          {canCreate && (
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => setAction({ kind: "new" })}>
+              <Plus className="h-4 w-4" />
+              Cadastrar primeiro imóvel
+            </Button>
+          )}
+        </div>
+      ) : loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-64" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {rows.map((property) => {
+            const price = priceForRow(property);
+            const actions = lifecycle(property);
+            const busy = busyId === property.id;
+            return (
+              <PropertyCard
+                key={property.id}
+                property={property}
+                price={price}
+                canUpdate={canUpdate}
+                canDelete={canDelete}
+                busy={busy}
+                onAction={setAction}
+                onLifecycle={actions}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      <PropertyDialogs action={action} onClose={() => setAction(null)} onSaved={onChanged} />
+    </div>
   );
 }
+
+function PropertyCard({
+  property,
+  price,
+  canUpdate,
+  canDelete,
+  busy,
+  onAction,
+  onLifecycle,
+}: {
+  property: PropertyRow;
+  price: ReturnType<typeof priceForRow>;
+  canUpdate: boolean;
+  canDelete: boolean;
+  busy: boolean;
+  onAction: (a: PropertyAction) => void;
+  onLifecycle: LifecycleActions;
+}) {
+  return (
+    <div className="flex flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm transition-shadow hover:shadow-md">
+      <div className="relative aspect-[16/10] w-full bg-slate-100">
+        <PropertyThumb
+          url={property.coverImage}
+          title={property.title}
+          category={property.category}
+          className="h-full w-full"
+        />
+        <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+          <Badge variant={STATUS_BADGE_VARIANTS[property.status]}>{STATUS_LABELS[property.status]}</Badge>
+          {property.isFeatured && <Badge variant="neutral">Destaque</Badge>}
+          {!property.isActive && <Badge variant="outline">Oculto</Badge>}
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col p-4">
+        <h3 className="truncate font-semibold text-slate-900" title={property.title}>
+          {property.title}
+        </h3>
+        <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-slate-500">
+          <MapPin className="h-3.5 w-3.5" />
+          <span className="truncate">{locationForRow(property) || "Sem localização"}</span>
+        </p>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <div>
+            <span className="text-base font-extrabold text-slate-900 tabular-nums">
+              {price.label}
+            </span>
+            {price.period && <span className="ml-0.5 text-xs font-medium text-slate-500">{price.period}</span>}
+          </div>
+          <Badge variant="secondary">{TARGET_LABELS[property.target]}</Badge>
+        </div>
+
+        <div className="mt-4 flex items-center gap-1.5 border-t border-slate-100 pt-3">
+          {canUpdate && (
+            <Button size="sm" variant="secondary" onClick={() => onAction({ kind: "edit", property })}>
+              <Pencil className="h-3.5 w-3.5" />
+              Editar
+            </Button>
+          )}
+          <span className="font-mono text-[0.7rem] text-slate-400">{property.code}</span>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" className="ml-auto" aria-label={`Ações para ${property.title}`} disabled={busy}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => onAction({ kind: "view", property })}>
+                <Eye />
+                Ver detalhes
+              </DropdownMenuItem>
+              {canUpdate && (
+                <>
+                  <DropdownMenuItem onSelect={() => void onLifecycle.duplicate()}>
+                    <Copy />
+                    Duplicar
+                  </DropdownMenuItem>
+                  {property.isFeatured ? (
+                    <DropdownMenuItem onSelect={() => void onLifecycle.toggleFeatured()}>
+                      <StarOff />
+                      Remover destaque
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onSelect={() => void onLifecycle.toggleFeatured()}>
+                      <Star />
+                      Destacar
+                    </DropdownMenuItem>
+                  )}
+                  {property.isActive ? (
+                    <DropdownMenuItem onSelect={() => void onLifecycle.toggleActive()}>
+                      <EyeOff />
+                      Desativar (ocultar)
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onSelect={() => void onLifecycle.toggleActive()}>
+                      <Eye />
+                      Ativar (publicar)
+                    </DropdownMenuItem>
+                  )}
+                  {property.status !== "SOLD" && (
+                    <DropdownMenuItem onSelect={() => void onLifecycle.setStatus("SOLD")}>
+                      <BadgeCheck />
+                      Marcar vendido
+                    </DropdownMenuItem>
+                  )}
+                  {property.status !== "RENTED" && (
+                    <DropdownMenuItem onSelect={() => void onLifecycle.setStatus("RENTED")}>
+                      <CalendarCheck />
+                      Marcar alugado
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onSelect={() => onAction({ kind: "media", property })}>
+                    <Images />
+                    Fotos e vídeos
+                  </DropdownMenuItem>
+                </>
+              )}
+              {canDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-red-600 focus:bg-red-50 focus:text-red-700" onSelect={() => onAction({ kind: "delete", property })}>
+                    <Trash2 />
+                    Excluir
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export type { LifecycleActions };
