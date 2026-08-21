@@ -7,6 +7,26 @@ import { ChevronLeft, ChevronRight, Expand, X } from "lucide-react";
 import type { PublicMedia } from "@/lib/public/types";
 
 /**
+ * Renders a media image. Same-origin URLs (local `/api/media/[id]/bytes`) need a
+ * plain <img> — next/image would fetch server-side and lose the session cookie.
+ */
+function GalleryImage({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+}) {
+  if (src.startsWith("/")) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt={alt} className={className} />;
+  }
+  return <Image src={src} alt={alt} fill sizes="100vw" className={className} />;
+}
+
+/**
  * Client-side gallery with a lightbox. Renders the thumbnails/progressive
  * images via next/image; the full-screen overlay uses Radix Dialog for
  * a11y (focus trap, ESC to close, aria).
@@ -37,13 +57,10 @@ export function Gallery({
         onClick={() => setOpen(true)}
         aria-label="Ampliar foto"
       >
-        <Image
+        <GalleryImage
           src={current!.url}
           alt={`${title} — foto ${active + 1}`}
-          fill
-          priority
-          sizes="(min-width: 1024px) 70vw, 100vw"
-          className="object-cover"
+          className="absolute inset-0 h-full w-full object-cover"
         />
         <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-slate-950/60 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
           <Expand className="h-3.5 w-3.5" />
@@ -64,7 +81,7 @@ export function Gallery({
               }`}
               aria-label={`Selecionar foto ${i + 1}`}
             >
-              <Image src={img.url} alt="" fill sizes="96px" className="object-cover" />
+              <GalleryImage src={img.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
             </button>
           ))}
         </div>
@@ -77,12 +94,10 @@ export function Gallery({
           <Dialog.Content className="fixed inset-0 z-50 flex h-full w-full flex-col items-center justify-center p-4">
             <Dialog.Title className="sr-only">{title}</Dialog.Title>
             <div className="relative flex h-full w-full max-w-6xl items-center justify-center">
-              <Image
+              <GalleryImage
                 src={current!.url}
                 alt={`${title} — foto ${active + 1}`}
-                fill
-                sizes="100vw"
-                className="object-contain"
+                className="absolute inset-0 h-full w-full object-contain"
               />
             </div>
 

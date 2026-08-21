@@ -79,6 +79,7 @@ export function PropertyManager({
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [targetFilter, setTargetFilter] = useState("");
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -89,9 +90,10 @@ export function PropertyManager({
       }
       if (statusFilter && property.status !== statusFilter) return false;
       if (categoryFilter && property.category !== categoryFilter) return false;
+      if (targetFilter && property.target !== targetFilter) return false;
       return true;
     });
-  }, [rows, q, statusFilter, categoryFilter]);
+  }, [rows, q, statusFilter, categoryFilter, targetFilter]);
 
   async function runLifecycle(property: PropertyRow, request: () => Promise<Response>, failMessage: string) {
     setActionError(null);
@@ -181,7 +183,7 @@ export function PropertyManager({
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           aria-label="Situação"
-          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+          className="h-9 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
         >
           <option value="">Toda situação</option>
           {(Object.keys(STATUS_LABELS) as Array<keyof typeof STATUS_LABELS>).map((s) => (
@@ -189,10 +191,21 @@ export function PropertyManager({
           ))}
         </select>
         <select
+          value={targetFilter}
+          onChange={(e) => setTargetFilter(e.target.value)}
+          aria-label="Tipo"
+          className="h-9 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+        >
+          <option value="">Tipo (venda/aluguel)</option>
+          <option value="SALE">À venda</option>
+          <option value="RENT">Para alugar</option>
+          <option value="BOTH">Venda e aluguel</option>
+        </select>
+        <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
           aria-label="Categoria"
-          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
+          className="h-9 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60"
         >
           <option value="">Toda categoria</option>
           {(Object.keys(CATEGORY_LABELS) as Array<keyof typeof CATEGORY_LABELS>).map((c) => (
@@ -311,7 +324,7 @@ function PropertyCard({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="icon-sm" className="ml-auto" aria-label="Mais ações" title="Mais ações" disabled={busy}>
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" strokeWidth={3} />}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
