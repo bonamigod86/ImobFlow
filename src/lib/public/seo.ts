@@ -10,7 +10,7 @@ import { CATEGORY_LABELS, TARGET_LABELS } from "@/lib/public/types";
  * structured data (RealEstateListing + Place) for every PDP.
  */
 
-export const SITE_NAME = "SaaS Imob";
+export const SITE_NAME = "imobFlow";
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://imob.example.com").replace(/\/$/, "");
 export const LOCALE = "pt_BR";
 

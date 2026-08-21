@@ -2,7 +2,7 @@ import { getServerSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import TeamUsersConsole from "@/components/dashboard/TeamUsersConsole";
 
-export const metadata = { title: "Usuários e permissões | SaaS Imob" };
+export const metadata = { title: "Usuários e permissões | imobFlow" };
 
 export default async function TeamPage() {
   const session = await getServerSession();

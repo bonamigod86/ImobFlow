@@ -102,7 +102,7 @@ const envSchema = z.object({
   EMAIL_API_KEY: z.string().optional().default(""),
   /** From address for all transactional mail. */
   EMAIL_FROM: z.string().email().default("naoresponda@imob.example.com"),
-  EMAIL_FROM_NAME: z.string().default("SaaS Imob"),
+  EMAIL_FROM_NAME: z.string().default("imobFlow"),
   /** AWS region used by the SES transport. */
   SES_REGION: z.string().optional().default("us-east-1"),
   SES_ACCESS_KEY_ID: z.string().optional().default(""),

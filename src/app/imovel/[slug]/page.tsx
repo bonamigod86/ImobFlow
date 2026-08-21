@@ -48,7 +48,7 @@ interface PDPProps {
 
 export async function generateMetadata({ params }: PDPProps): Promise<Metadata> {
   const property = await getPublicListing(decodeURIComponent(params.slug));
-  return property ? listingMetadata(property) : { title: "Imóvel não encontrado | SaaS Imob" };
+  return property ? listingMetadata(property) : { title: "Imóvel não encontrado | imobFlow" };
 }
 
 function SpecItem({ icon: Icon, label, value }: { icon: typeof BedDouble; label: string; value: React.ReactNode }) {

@@ -2,7 +2,7 @@ import { getServerSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import PrivacyConsole from "@/components/dashboard/PrivacyConsole";
 
-export const metadata = { title: "Privacidade · LGPD | SaaS Imob" };
+export const metadata = { title: "Privacidade · LGPD | imobFlow" };
 
 export default async function PrivacyPage() {
   const session = await getServerSession();

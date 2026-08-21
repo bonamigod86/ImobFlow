@@ -4,7 +4,7 @@ import { SiteFooter } from "@/components/portal/SiteFooter";
 import { RegisterForm } from "@/components/portal/RegisterForm";
 
 export const metadata = {
-  title: "Criar conta | SaaS Imob",
+  title: "Criar conta | imobFlow",
   description: "Cadastre sua imobiliária ou perfil de corretor autônomo.",
 };
 

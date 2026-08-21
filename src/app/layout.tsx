@@ -4,8 +4,12 @@ import { TenantProvider, type TenantMeta } from "@/lib/tenant/tenant-client-cont
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SaaS Imob",
-  description: "Multi-tenant real-estate platform",
+  title: "imobFlow",
+  description: "Plataforma imobiliária multi-tenant — portal público, SaaS por assinatura e geração de leads.",
+  icons: {
+    icon: "/images/imobFlow_logo.png",
+    apple: "/images/imobFlow_logo.png",
+  },
 };
 
 /**

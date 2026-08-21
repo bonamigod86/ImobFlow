@@ -2,7 +2,7 @@ import { getServerSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { TenantProfileForm } from "@/components/dashboard/TenantProfileForm";
 
-export const metadata = { title: "Perfil da conta | SaaS Imob" };
+export const metadata = { title: "Perfil da conta | imobFlow" };
 
 export default async function ProfilePage() {
   const session = await getServerSession();
