@@ -10,7 +10,10 @@ import { getDashboardSnapshot } from "@/lib/analytics/dashboard";
  * top properties by views.
  */
 
-export const GET = withApiRoute(ACTIONS.DASHBOARD_READ, async () => {
-  const snapshot = await getDashboardSnapshot();
+export const GET = withApiRoute(ACTIONS.DASHBOARD_READ, async (ctx, req) => {
+  const assignedToMe = new URL(req.url).searchParams.get("assignedToMe") === "true";
+  const snapshot = await getDashboardSnapshot({
+    ...(assignedToMe && ctx.userId ? { assignedToUserId: ctx.userId } : {}),
+  });
   return ok({ snapshot });
 });

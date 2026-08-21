@@ -328,12 +328,12 @@ function PropertyCard({
                 disabled={busy}
                 aria-label="Mais ações"
                 title="Mais ações"
-                className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-60"
+                className="ml-auto flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-60"
               >
                 {busy ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <Loader2 className="h-7 w-7 animate-spin" />
                 ) : (
-                  <MoreHorizontal className="h-5 w-5" strokeWidth={2.5} aria-hidden="true" />
+                  <MoreHorizontal className="h-7 w-7" strokeWidth={2.75} aria-hidden="true" />
                 )}
               </button>
             </DropdownMenuTrigger>

@@ -102,21 +102,22 @@ export default async function LandingPage() {
 
       {/* Cities */}
       {cities.length > 0 && (
-        <section className="border-y border-slate-200 bg-white">
+        <section className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900">
           <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-            <h2 className="mb-6 text-2xl font-bold tracking-tight text-slate-900">Explore por cidade</h2>
+            <h2 className="mb-2 text-2xl font-bold tracking-tight text-white">Explore por cidade</h2>
+            <p className="mb-6 text-sm text-emerald-100/90">Encontre oportunidades nas principais cidades atendidas.</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {cities.map((c) => (
                 <Link
                   key={c.slug}
                   href={`/imoveis/${c.slug}`}
-                  className="group flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 transition-colors hover:border-brand-300 hover:bg-brand-50"
+                  className="group flex items-center justify-between rounded-xl bg-white/10 px-4 py-3.5 text-white backdrop-blur-sm transition-colors hover:bg-white/20"
                 >
                   <div>
-                    <span className="font-semibold text-slate-800 group-hover:text-emerald-700">{c.city}</span>
-                    <span className="ml-2 text-sm text-slate-500">· {c.state}</span>
+                    <span className="font-semibold text-white group-hover:text-emerald-100">{c.city}</span>
+                    <span className="ml-2 text-sm text-emerald-100/80">· {c.state}</span>
                   </div>
-                  <span className="text-sm text-slate-400">{c.listingCount} imóveis</span>
+                  <span className="text-sm text-emerald-100/70">{c.listingCount} imóveis</span>
                 </Link>
               ))}
             </div>

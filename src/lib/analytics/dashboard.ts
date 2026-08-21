@@ -94,10 +94,13 @@ function payloadHas(payload: unknown, key: string, value?: string): boolean {
 /**
  * Aggregate the snapshot inside the current tenant context.
  */
-export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
+export async function getDashboardSnapshot(opts: { assignedToUserId?: string } = {}): Promise<DashboardSnapshot> {
   const tenantId = requireTenantId();
   const weekAgo = windowStart(7);
   const monthAgo = windowStart(30);
+  const assignedFilter = opts.assignedToUserId
+    ? { assignedToId: opts.assignedToUserId }
+    : undefined;
 
   const [
     statusRows,
@@ -109,6 +112,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     ledgerRow,
     leadRows,
     topByLeadsRows,
+    usedLeadsTotal,
   ] = await Promise.all([
     // Status breakdown (live, authoritative listing state).
     prisma.property.groupBy({
@@ -132,17 +136,19 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     prisma.highlightCreditLedger.findFirst({ orderBy: { createdAt: "desc" } }),
     // Leads dos últimos 30 dias para os funis de canal (visita / whatsapp).
     prisma.lead.findMany({
-      where: { createdAt: { gte: monthAgo } },
+      where: { createdAt: { gte: monthAgo }, ...(assignedFilter ?? {}) },
       select: { createdAt: true, payload: true },
     }),
     // Imóveis com maior geração de leads (30 dias).
     prisma.lead.groupBy({
       by: ["propertyId"],
-      where: { propertyId: { not: null }, createdAt: { gte: monthAgo } },
+      where: { propertyId: { not: null }, createdAt: { gte: monthAgo }, ...(assignedFilter ?? {}) },
       _count: { _all: true },
       orderBy: { _count: { propertyId: "desc" } },
       take: 5,
     }),
+    // Total de leads do tenant (utilização do plano não é escopada por corretor).
+    prisma.lead.count(),
   ]);
 
   const statusBreakdown: StatusBreakdown = {
@@ -170,7 +176,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
         maxUsers: plan.maxUsers ?? num(features.maxUsers) ?? null,
         usedUsers,
         maxLeads: plan.maxLeads ?? num(features.maxLeads) ?? null,
-        usedLeads: leadRows.length,
+        usedLeads: usedLeadsTotal,
         maxHighlights: plan.highlightCredits,
         usedHighlights,
         highlightBalance: ledgerRow?.balanceAfter ?? 0,

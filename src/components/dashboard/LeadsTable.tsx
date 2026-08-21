@@ -143,9 +143,11 @@ function truncate(s: string, n: number): string {
 export default function LeadsTable({
   limit,
   showHeader = true,
+  defaultMineOnly = false,
 }: {
   limit?: number;
   showHeader?: boolean;
+  defaultMineOnly?: boolean;
 }) {
   const [items, setItems] = useState<LeadItem[]>([]);
   const [page, setPage] = useState(1);
@@ -155,6 +157,7 @@ export default function LeadsTable({
   const [q, setQ] = useState("");
   const [solicitation, setSolicitation] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [mineOnly, setMineOnly] = useState(defaultMineOnly);
 
   const pageSize = limit ?? 50;
   const onlyFirstPage = limit !== undefined;
@@ -176,7 +179,8 @@ export default function LeadsTable({
     async (pageNumber: number) => {
       setBusy(true);
       try {
-        const res = await fetch(`/api/leads?page=${pageNumber}&pageSize=${pageSize}`);
+        const mine = mineOnly ? "&assignedToMe=true" : "";
+        const res = await fetch(`/api/leads?page=${pageNumber}&pageSize=${pageSize}${mine}`);
         const body = (await res.json().catch(() => ({}))) as { items?: LeadItem[]; pagination?: { total: number } };
         if (!res.ok || (body as { error?: string }).error) throw new Error("Falha ao carregar leads.");
         setItems(body.items ?? []);
@@ -186,7 +190,7 @@ export default function LeadsTable({
         setBusy(false);
       }
     },
-    [pageSize],
+    [pageSize, mineOnly],
   );
 
   useEffect(() => {
@@ -255,6 +259,17 @@ export default function LeadsTable({
           <option value="WON">Concluído</option>
           <option value="LOST">Arquivado</option>
         </select>
+        <button
+          type="button"
+          onClick={() => setMineOnly((v) => !v)}
+          className={`h-10 shrink-0 whitespace-nowrap rounded-md border px-3 text-sm font-medium transition-colors ${
+            mineOnly
+              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          {mineOnly ? "Mostrando só os meus" : "Meus leads"}
+        </button>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200">

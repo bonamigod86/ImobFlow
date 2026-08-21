@@ -10,6 +10,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { PropertyManager } from "@/components/dashboard/PropertyManager";
 import LeadsTable from "@/components/dashboard/LeadsTable";
+import TeamUsersConsole from "@/components/dashboard/TeamUsersConsole";
 import { TenantProfileForm } from "@/components/dashboard/TenantProfileForm";
 import { PlatformEmptyState } from "@/components/dashboard/PlatformEmptyState";
 import type { DashboardSnapshot, PropertyRow, StatusCounts } from "@/components/dashboard/types";
@@ -36,7 +37,7 @@ interface SnapshotEnvelope {
   error?: string;
 }
 
-type DashboardTab = "overview" | "properties" | "leads" | "profile";
+type DashboardTab = "overview" | "properties" | "leads" | "team" | "profile";
 
 /**
  * Tenant dashboard — tabbed workspace: Início (executive overview), Imóveis
@@ -50,6 +51,8 @@ export default function DashboardView({ user, tenant, actions }: DashboardViewPr
   const canCreate = actions.includes("properties:create");
   const canUpdate = actions.includes("properties:update");
   const canDelete = actions.includes("properties:delete");
+  const canManageUsers = actions.includes("users:read");
+  const isAgent = user.role === "AGENT";
 
   const refresh = useCallback(async () => {
     if (!tenant) return;
@@ -57,7 +60,7 @@ export default function DashboardView({ user, tenant, actions }: DashboardViewPr
     try {
       const [propsRes, snapRes] = await Promise.all([
         fetch("/api/properties?pageSize=100"),
-        fetch("/api/analytics/dashboard"),
+        fetch(isAgent ? "/api/analytics/dashboard?assignedToMe=true" : "/api/analytics/dashboard"),
       ]);
       const propsBody = (await propsRes.json().catch(() => ({}))) as PropertiesEnvelope;
       const snapBody = (await snapRes.json().catch(() => ({}))) as SnapshotEnvelope;
@@ -76,7 +79,7 @@ export default function DashboardView({ user, tenant, actions }: DashboardViewPr
     } catch (err) {
       setLoad({ status: "error", message: err instanceof Error ? err.message : "Falha ao carregar o painel." });
     }
-  }, [tenant]);
+  }, [tenant, isAgent]);
 
   useEffect(() => {
     if (tenant) void refresh();
@@ -120,6 +123,7 @@ export default function DashboardView({ user, tenant, actions }: DashboardViewPr
             <TabsTrigger value="overview">Início</TabsTrigger>
             <TabsTrigger value="properties">Imóveis</TabsTrigger>
             <TabsTrigger value="leads">Leads</TabsTrigger>
+            {canManageUsers && <TabsTrigger value="team">Equipe</TabsTrigger>}
             <TabsTrigger value="profile">Gerenciar perfil</TabsTrigger>
           </TabsList>
 
@@ -145,8 +149,14 @@ export default function DashboardView({ user, tenant, actions }: DashboardViewPr
           </TabsContent>
 
           <TabsContent value="leads">
-            <LeadsTable />
+            <LeadsTable defaultMineOnly={isAgent} />
           </TabsContent>
+
+          {canManageUsers && (
+            <TabsContent value="team">
+              <TeamUsersConsole />
+            </TabsContent>
+          )}
 
           <TabsContent value="profile">
             <TenantProfileForm />

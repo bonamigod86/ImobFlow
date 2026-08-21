@@ -1,25 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Building2, Loader2, Lock, Mail } from "lucide-react";
-
-const DEMO_PASSWORD = "ChangeMe-123!";
+import { useRouter } from "next/navigation";
+import { Loader2, Lock, Mail } from "lucide-react";
 
 const DEMO_ACCOUNTS = [
-  { label: "Proprietário (acme)", email: "owner@acme.com", tenantSlug: "acme" },
-  { label: "Corretor (acme)", email: "agent@acme.com", tenantSlug: "acme" },
-  { label: "Admin plataforma", email: "admin@saas.local", tenantSlug: "" },
+  { label: "Proprietário (acme)", email: "acme@acme.com", password: "NovaSenha!456" },
+  { label: "Corretor (acme)", email: "agent@acme.com", password: "ChangeMe-123!" },
+  { label: "Admin plataforma", email: "admin@saas.local", password: "ChangeMe-123!" },
 ];
 
 export default function LoginForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const tenantFromQuery = searchParams?.get("tenant") ?? "";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [tenantSlug, setTenantSlug] = useState(tenantFromQuery);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -31,7 +26,7 @@ export default function LoginForm() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password, tenantSlug: tenantSlug || undefined }),
+        body: JSON.stringify({ email, password }),
       });
       const data = (await res.json()) as { error?: string; message?: string; user?: { role?: string } };
       if (!res.ok) {
@@ -48,10 +43,9 @@ export default function LoginForm() {
     }
   }
 
-  function fillDemo(account: { email: string; tenantSlug: string }) {
+  function fillDemo(account: { email: string; password: string }) {
     setEmail(account.email);
-    setPassword(DEMO_PASSWORD);
-    setTenantSlug(account.tenantSlug);
+    setPassword(account.password);
     setError(null);
   }
 
@@ -82,17 +76,6 @@ export default function LoginForm() {
           placeholder="Sua senha"
           autoComplete="current-password"
           required
-          className={inputClass}
-        />
-      </div>
-
-      <div className="relative">
-        <Building2 className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          type="text"
-          value={tenantSlug}
-          onChange={(e) => setTenantSlug(e.target.value)}
-          placeholder="Tenant (ex.: acme) — opcional"
           className={inputClass}
         />
       </div>

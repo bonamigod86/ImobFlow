@@ -27,7 +27,7 @@ const VALID_STATUSES = [
 
 const VALID_TYPES = ["BUYER", "SELLER", "RENTER", "INVESTOR", "FINANCIAL"] as const;
 
-export const GET = withApiRoute(ACTIONS.LEADS_READ, async (_ctx, req) => {
+export const GET = withApiRoute(ACTIONS.LEADS_READ, async (ctx, req) => {
   const { page, pageSize } = queryPageSchema.parse(
     Object.fromEntries(new URL(req.url).searchParams),
   );
@@ -38,8 +38,13 @@ export const GET = withApiRoute(ACTIONS.LEADS_READ, async (_ctx, req) => {
     ? (statusRaw as LeadStatus)
     : undefined;
   const type = VALID_TYPES.includes(typeRaw as LeadType) ? (typeRaw as LeadType) : undefined;
+  const assignedToMe = qs.assignedToMe === "true" && ctx.userId;
 
-  const where: Prisma.LeadWhereInput = { ...(status ? { status } : {}), ...(type ? { type } : {}) };
+  const where: Prisma.LeadWhereInput = {
+    ...(status ? { status } : {}),
+    ...(type ? { type } : {}),
+    ...(assignedToMe ? { assignedToId: ctx.userId } : {}),
+  };
   const [items, total] = await prisma.$transaction([
     prisma.lead.findMany({
       where,

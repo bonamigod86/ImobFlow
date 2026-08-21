@@ -164,57 +164,45 @@ export default async function PDP({ params }: PDPProps) {
 
           {/* Sidebar: broker card + contact */}
           <aside className="space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Fale direto</h2>
+            <div className="rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 text-white shadow-lg">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-100/80">Fale direto</h2>
 
-              {property.broker ? (
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-100 text-brand-700">
-                    <Building2 className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-slate-900">{property.broker.name}</p>
-                    <p className="text-sm text-slate-500">{property.tenantName}</p>
-                  </div>
+              <div className="mt-4 flex items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/15 text-white">
+                  <Building2 className="h-6 w-6" />
                 </div>
-              ) : (
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-100 text-brand-700">
-                    <Building2 className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-slate-900">{property.tenantName}</p>
-                    <p className="text-sm text-slate-500">Imobiliária parceira</p>
-                  </div>
+                <div>
+                  <p className="font-semibold text-white">{property.broker?.name ?? property.tenantName}</p>
+                  <p className="text-sm text-emerald-100/90">
+                    {property.broker ? property.tenantName : "Imobiliária parceira"}
+                  </p>
                 </div>
-              )}
+              </div>
 
               <div className="mt-4 space-y-2 text-sm">
                 {property.broker?.email && (
                   <a
                     href={`mailto:${property.broker.email}`}
-                    className="flex items-center gap-2 text-slate-600 transition-colors hover:text-brand-600"
+                    className="flex items-center gap-2 text-emerald-50 transition-colors hover:text-white"
                   >
-                    <Mail className="h-4 w-4 shrink-0 text-slate-400" />
+                    <Mail className="h-4 w-4 shrink-0 text-white/70" />
                     <span className="truncate">{property.broker.email}</span>
                   </a>
                 )}
                 {property.broker?.phone && (
                   <a
                     href={`tel:${property.broker.phone}`}
-                    className="flex items-center gap-2 text-slate-600 transition-colors hover:text-brand-600"
+                    className="flex items-center gap-2 text-emerald-50 transition-colors hover:text-white"
                   >
-                    <Phone className="h-4 w-4 shrink-0 text-slate-400" />
+                    <Phone className="h-4 w-4 shrink-0 text-white/70" />
                     {property.broker.phone}
                   </a>
                 )}
               </div>
 
-              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                <p className="flex items-center gap-2">
-                  <CalendarClock className="h-4 w-4 text-brand-600" />
-                  Agende uma visita sem compromisso.
-                </p>
+              <div className="mt-5 flex items-center gap-2 rounded-xl bg-white/10 p-3 text-sm text-emerald-50 backdrop-blur-sm">
+                <CalendarClock className="h-4 w-4 shrink-0 text-white/70" />
+                Agende uma visita sem compromisso.
               </div>
 
               <div className="mt-5">
