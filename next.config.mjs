@@ -27,6 +27,9 @@ const scriptSources = ["'self'", "'unsafe-inline'", "blob:", ...(isDev ? ["'unsa
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Self-contained server (.next/standalone) — required by the production
+  // Dockerfile and keeps the runtime footprint small on small hosts.
+  output: "standalone",
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   experimental: {
