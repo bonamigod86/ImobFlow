@@ -27,7 +27,8 @@ export type DialogAction =
   | { kind: "plan"; tenant: TenantRef }
   | { kind: "payment"; tenant: TenantRef }
   | { kind: "block"; tenant: TenantRef }
-  | { kind: "unblock"; tenant: TenantRef };
+  | { kind: "unblock"; tenant: TenantRef }
+  | { kind: "approve"; tenant: TenantRef };
 
 interface ActionDialogProps {
   state: DialogAction | null;
@@ -117,6 +118,9 @@ function DialogBody({
         onRun={(fn) => run(fn)}
       />
     );
+  }
+  if (state.kind === "approve") {
+    return <ApproveBody tenant={tenant} busy={busy} error={error} onClose={onClose} onRun={(fn) => run(fn)} />;
   }
   return <PlanBody tenant={tenant} busy={busy} error={error} onClose={onClose} onRun={(fn) => run(fn)} />;
 }
@@ -367,6 +371,48 @@ function PlanBody({
           }),
         label: "Salvar plano",
       })}
+    </>
+  );
+}
+
+function ApproveBody({
+  tenant,
+  busy,
+  error,
+  onClose,
+  onRun,
+}: {
+  tenant: TenantRef;
+  busy: boolean;
+  error: string | null;
+  onClose: () => void;
+  onRun: (fn: () => Promise<string>) => void;
+}) {
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Aprovar cadastro</DialogTitle>
+        <DialogDescription>
+          Aprovar o cadastro de <strong>{tenant.name}</strong> ({tenant.slug})? O assinante
+          passará a ter acesso ao painel e a publicar conteúdo.
+        </DialogDescription>
+      </DialogHeader>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      <DialogFooter>
+        <Button variant="ghost" onClick={onClose} disabled={busy}>Cancelar</Button>
+        <Button
+          onClick={() =>
+            onRun(async () => {
+              await postJson(`/api/admin/tenants/${encodeURIComponent(tenant.id)}/approve`);
+              return `Cadastro de "${tenant.name}" aprovado.`;
+            })
+          }
+          disabled={busy}
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Aprovar
+        </Button>
+      </DialogFooter>
     </>
   );
 }

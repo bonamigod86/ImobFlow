@@ -58,6 +58,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (tenant.status === "BLOCKED" || tenant.status === "CANCELLED") {
         return fail(403, "TENANT_INACTIVE", "This account's tenant is inactive.");
       }
+      // Cadastro ainda não aprovado pelo MASTER.
+      if (!tenant.approvedAt) {
+        return fail(403, "TENANT_PENDING_APPROVAL", "Cadastro aguardando aprovação da plataforma.");
+      }
     }
 
     // Optional tenant targeting (subdomain / login page tenant selector).

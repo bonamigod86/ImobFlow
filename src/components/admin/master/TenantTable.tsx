@@ -32,6 +32,7 @@ import {
   Scale,
   Lock,
   Unlock,
+  BadgeCheck,
   Loader2,
 } from "lucide-react";
 import {
@@ -181,7 +182,10 @@ function TenantRowItem({
         {dateBR(tenant.subscribedAt)}
       </TableCell>
       <TableCell>
-        <Badge variant={STATUS_BADGE[tenant.status]}>{STATUS_LABELS[tenant.status]}</Badge>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant={STATUS_BADGE[tenant.status]}>{STATUS_LABELS[tenant.status]}</Badge>
+          {!tenant.approvedAt && <Badge variant="warning">Pendente</Badge>}
+        </div>
       </TableCell>
       <TableCell className="hidden text-sm sm:table-cell">
         {tenant.pendingCents > 0 ? (
@@ -202,6 +206,12 @@ function TenantRowItem({
           <DropdownMenuContent align="end" className="min-w-[13rem]">
             <DropdownMenuLabel>{tenant.slug}</DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {!tenant.approvedAt && (
+              <DropdownMenuItem onSelect={() => onAction({ kind: "approve", tenant })}>
+                <BadgeCheck className="h-4 w-4" />
+                Aprovar cadastro
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onSelect={() => onAction({ kind: "impersonate", tenant })}>
               <Eye className="h-4 w-4" />
               Entrar como assinante

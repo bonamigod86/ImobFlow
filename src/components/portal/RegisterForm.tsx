@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Building2, CheckCircle2, Headset, Loader2 } from "lucide-react";
 
 /**
@@ -10,10 +9,10 @@ import { Building2, CheckCircle2, Headset, Loader2 } from "lucide-react";
  * and the user lands on their own /dashboard.
  */
 export function RegisterForm() {
-  const router = useRouter();
   const [type, setType] = useState<"AGENCY" | "BROKER">("AGENCY");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
 
   async function submit(form: FormData) {
     setSending(true);
@@ -54,7 +53,8 @@ export function RegisterForm() {
           : data?.message ?? "Não foi possível criar a conta. Tente novamente.";
         throw new Error(message);
       }
-      router.push("/dashboard");
+      // Cadastro criado — aguarda aprovação do MASTER (sem sessão automática).
+      setDone(true);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -82,6 +82,17 @@ export function RegisterForm() {
 
   return (
     <form action={submit} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      {done ? (
+        <div className="py-6 text-center">
+          <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" />
+          <h2 className="mt-4 text-lg font-bold text-slate-900">Cadastro recebido!</h2>
+          <p className="mx-auto mt-2 max-w-sm text-sm text-slate-600">
+            Sua conta foi criada e está <strong>aguardando aprovação</strong> da plataforma.
+            Você receberá o acesso assim que for aprovado pelo MASTER.
+          </p>
+        </div>
+      ) : (
+      <>
       <div>
         <p className={label}>Tipo de conta *</p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -188,11 +199,13 @@ export function RegisterForm() {
         className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-60"
       >
         {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-        {sending ? "Criando conta…" : "Criar conta e entrar"}
+        {sending ? "Criando conta…" : "Criar conta"}
       </button>
       <p className="mt-3 text-center text-xs text-slate-400">
         Seus dados são usados apenas para gestão da sua conta. Cada assinante tem ambiente isolado.
       </p>
+      </>
+      )}
     </form>
   );
 }

@@ -41,6 +41,7 @@ export interface MasterTenantRow {
   subscribedAt: string | null;
   nextInvoiceDueAt: string | null;
   pendingCents: number;
+  approvedAt: string | null;
   manualBlockedAt: string | null;
 }
 
@@ -186,6 +187,7 @@ export async function getMasterControlData(): Promise<MasterControlData> {
         name: true,
         slug: true,
         status: true,
+        approvedAt: true,
         manualBlockedAt: true,
         plan: { select: { code: true, name: true } },
         subscription: {
@@ -253,6 +255,7 @@ export async function getMasterControlData(): Promise<MasterControlData> {
     subscribedAt: t.subscription?.createdAt?.toISOString() ?? null,
     nextInvoiceDueAt: t.subscription?.nextInvoiceDueAt?.toISOString() ?? null,
     pendingCents: pendingByTenant.get(t.id) ?? 0,
+    approvedAt: t.approvedAt?.toISOString() ?? null,
     manualBlockedAt: t.manualBlockedAt?.toISOString() ?? null,
   }));
 

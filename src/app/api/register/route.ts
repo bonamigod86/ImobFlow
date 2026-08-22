@@ -1,9 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { registerSchema } from "@/lib/validation/schemas";
 import { hashPassword } from "@/lib/auth/password";
-import { signSessionToken, SESSION_COOKIE } from "@/lib/auth/jwt";
-import { sessionCookieOptions } from "@/lib/auth/session";
-import { cookies } from "next/headers";
 import { TenantAdminService } from "@/lib/tenant/tenant-admin";
 import { notifyWelcomeAccount } from "@/lib/email/notify";
 import { mapError } from "@/lib/http/errors";
@@ -53,15 +50,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       socialLinks: body.socialLinks,
     });
 
-    const token = await signSessionToken({
-      userId: ownerId,
-      tenantId: tenant.id,
-      tenantSlug: tenant.slug,
-      role: "OWNER",
-      email,
-      name: body.responsibleName,
-    });
-    cookies().set(SESSION_COOKIE, token, sessionCookieOptions());
+    // Aprovação do MASTER: o cadastro é criado pendente — sem sessão automática
+    // nem acesso ao painel até o MASTER aprovar (aprovadoAt definido).
+    const pending = { pendingApproval: true };
 
     // Non-blocking welcome e-mail (queue-backed).
     await notifyWelcomeAccount(ownerId, {
@@ -71,14 +62,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(
       {
-        user: {
-          id: ownerId,
-          name: body.responsibleName,
-          email,
-          role: "OWNER",
-          tenantId: tenant.id,
-          tenantSlug: tenant.slug,
-        },
+        ...pending,
         tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name, status: tenant.status },
       },
       { status: 201 },

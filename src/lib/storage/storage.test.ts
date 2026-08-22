@@ -8,7 +8,9 @@ import { resetLocalStorage, storage } from "@/lib/storage/storage";
  */
 
 describe("storage (local fallback)", () => {
-  beforeEach(() => resetLocalStorage());
+  beforeEach(async () => {
+    await resetLocalStorage();
+  });
 
   it("round-trips put/get", async () => {
     const payload = Buffer.from("image-bytes");

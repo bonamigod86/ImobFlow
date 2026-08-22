@@ -279,6 +279,8 @@ model Tenant {
   name      String
   slug      String       @unique // stable, lower-case; used for subdomain resolution
   status    TenantStatus @default(TRIAL)
+  /// Quando o MASTER aprovou o cadastro. NULL = pendente de aprovação (sem acesso).
+  approvedAt DateTime?
   type      TenantType   @default(AGENCY)
   planId    String
   plan      Plan         @relation(fields: [planId], references: [id], onDelete: Restrict)

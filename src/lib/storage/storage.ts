@@ -175,6 +175,7 @@ export function publicUrlForKey(key: string): string {
 }
 
 /** Reset the local disk store (tests). */
-export function resetLocalStorage(): void {
-  if (storage instanceof LocalStorage) void storage.reset();
+export function resetLocalStorage(): Promise<void> {
+  if (storage instanceof LocalStorage) return storage.reset();
+  return Promise.resolve();
 }

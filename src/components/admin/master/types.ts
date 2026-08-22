@@ -37,6 +37,7 @@ export interface TenantRow {
   subscribedAt: string | null;
   nextInvoiceDueAt: string | null;
   pendingCents: number;
+  approvedAt: string | null;
   manualBlockedAt: string | null;
 }
 
