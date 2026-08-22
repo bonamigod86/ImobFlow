@@ -1,483 +1,293 @@
-# SaaS Imob — Multi-Tenant Real Estate Platform
+<div align="center">
 
-Production-grade foundation (**Phase 1: multi-tenancy, RBAC, async queues, audit logging**) plus the **Phase 2: Property Management Engine** (listing lifecycle, resilient media pipeline, batch import, dashboard analytics), **Phase 3: Public Portal, Search & SEO** and **Phase 5: Billing, Subscription Engine & Master Admin** on **Next.js 14 (App Router) + PostgreSQL + Prisma + Redis/BullMQ + Docker**.
+<img src="public/images/imobFlow_logo.png" alt="imobFlow" width="220"/>
 
-> Strict data segregation is enforced at the ORM layer (fail-closed), not by
-> developer discipline — cross-tenant leakage is impossible by construction.
+# imobFlow
+
+**Plataforma SaaS multi-tenant para imobiliárias e corretores autônomos**
+
+Portal público com SEO · Gestão de imóveis e leads · Assinaturas e billing · Painel MASTER
+
+[![Next.js](https://img.shields.io/badge/Next.js_14-black?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![React](https://img.shields.io/badge/React_18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Prisma](https://img.shields.io/badge/Prisma_5-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io)
+[![Redis](https://img.shields.io/badge/Redis_7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
+[![BullMQ](https://img.shields.io/badge/BullMQ-E24244?style=for-the-badge)](https://bullmq.io)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com)
+
+</div>
 
 ---
 
-## Stack
+## 📖 Sobre
 
-| Layer        | Technology                                            |
-| ------------ | ----------------------------------------------------- |
-| Framework    | Next.js 14 (App Router, TypeScript, strict mode)      |
-| Database     | PostgreSQL 16 (row-level `tenant_id` segregation)     |
-| ORM          | Prisma 5 + a tenant-enforcing client extension        |
-| Cache/Queue  | Redis 7 + BullMQ (retries, backoff, DLQ)              |
-| Auth/N      | Custom JWT (jose, HS256) + RBAC permission matrix      |
-| Infra        | Docker Compose (postgres + redis + app + optional worker) |
+O **imobFlow** é uma plataforma de software como serviço (SaaS) que entrega a
+imobiliária ou o corretor autônomo uma operação digital completa em um único
+ambiente isolado: **portal público de anúncios**, **CRM de leads** (inclusive
+crédito imobiliário), **gestão de imóveis com mídias**, **assinaturas com
+dunning automático** e **monetização por destaques**.
+
+> 🔒 **Isolamento de dados por construção** — a segregação entre tenants é
+> aplicada na camada de ORM (*fail-closed*), não por disciplina de código.
+> Vazamento cruzado entre contas é impossível por arquitetura.
+
+| | |
+|---|---|
+| 🏢 **Multi-tenant real** | Resolução por subdomínio + extensão Prisma que injeta `tenant_id` em toda query |
+| 🏠 **Portal público SSR** | Busca avançada por URL, mapa Leaflet, JSON-LD (`RealEstateListing`), sitemap dinâmico |
+| 📊 **Painel do assinante** | KPIs de imóveis/leads/views, funil, equipe com papéis, integrações e webhooks |
+| 💳 **Billing completo** | Planos dinâmicos, trial, carência, dunning, suspensão automática, MRR/ARR |
+| ✨ **Créditos de destaque** | Ledger append-only: plano credita por ciclo, 1 crédito = 1 dia de destaque |
+| ⚙️ **Workers resilientes** | BullMQ com retry/backoff exponencial, DLQ com replay e auditoria |
 
 ---
 
-## Directory map
+## 🧰 Stack tecnológica
+
+| Camada | Tecnologia |
+|---|---|
+| Framework | [Next.js 14](https://nextjs.org) (App Router, React 18, TypeScript strict) |
+| Estilo | [Tailwind CSS](https://tailwindcss.com) + [lucide-react](https://lucide.dev) |
+| Banco de dados | [PostgreSQL 16](https://www.postgresql.org) — segregação por `tenant_id` + índices compostos |
+| ORM | [Prisma 5](https://www.prisma.io) + extensão client que impõe o tenant automaticamente |
+| Cache & filas | [Redis 7](https://redis.io) + [BullMQ](https://bullmq.io) (retry, backoff, DLQ) |
+| Autenticação | JWT HS256 ([jose](https://github.com/panva/jose)) + bcrypt + cookies HttpOnly |
+| Autorização | Matriz RBAC centralizada (5 papéis, catálogo de ações tipado) |
+| Validação | [Zod](https://zod.dev) em todas as fronteiras de request |
+| Mapas | [Leaflet](https://leafletjs.com) + OpenStreetMap |
+| Imagens | [sharp](https://sharp.pixelplumbing.com) — WebP + 3 variantes responsivas |
+| Storage | S3-compatível (AWS / Cloudflare R2 / MinIO) com fallback local |
+| Testes | [Vitest](https://vitest.dev) — 36 suítes, 246 testes |
+| Infra | Docker Compose (postgres + redis + app + worker opcional) |
+
+<p>
+  <img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind"/>
+  <img src="https://img.shields.io/badge/Zod-3E67B1?style=flat-square&logo=zod&logoColor=white" alt="Zod"/>
+  <img src="https://img.shields.io/badge/Vitest-6E9F18?style=flat-square&logo=vitest&logoColor=white" alt="Vitest"/>
+  <img src="https://img.shields.io/badge/JWT_(jose)-000000?style=flat-square&logo=jsonwebtokens&logoColor=white" alt="JWT"/>
+  <img src="https://img.shields.io/badge/Leaflet-199900?style=flat-square&logo=leaflet&logoColor=white" alt="Leaflet"/>
+  <img src="https://img.shields.io/badge/Stripe-008CDD?style=flat-square&logo=stripe&logoColor=white" alt="Stripe"/>
+  <img src="https://img.shields.io/badge/sharp-99CC00?style=flat-square" alt="sharp"/>
+</p>
+
+---
+
+## ✨ Funcionalidades
+
+### 🌐 Portal público (`/`)
+Landing page, catálogo `/imoveis` com filtros dirigidos pela URL
+(`/imoveis/sao-paulo-sp/venda/apartamento`), página de detalhe com galeria,
+lightbox, mapa, WhatsApp e agendamento de visita, captura de leads pública
+(cross-tenant, roteada ao tenant do anúncio), `sitemap.xml` dinâmico,
+Open Graph e dados estruturados Schema.org.
+
+### 🏠 Gestão de imóveis (`/dashboard`)
+CRUD completo com runner de ações (duplicar, status, destaque, soft-delete),
+preços venda/aluguel/condomínio/IPTU, especificações completas, geolocalização,
+pipeline de mídias com upload presignado e processamento assíncrono (WebP +
+thumb/medium/large), galeria reordenável e importação em lote
+(CSV/XML estilo portais/JSON) com dedupe e relatório por linha.
+
+### 📬 Leads e equipe
+Funil de qualificação com roteamento assíncrono por regras, consentimento LGPD,
+equipe com papéis OWNER/MANAGER/AGENT/RECEPTIONIST, KPIs de conversão
+(views → leads) e consolidação de crédito imobiliário com encaminhamento a
+sistemas externos autorizado pelo titular.
+
+### 💳 Assinaturas e billing (`/dashboard/billing`, `/admin/billing`)
+Motor de estado da assinatura (`TRIAL → ACTIVE → PAST_DUE → BLOCKED`),
+ingestão idempotente de webhooks com verificação HMAC sobre o body bruto,
+adapters Stripe/Asaas/custom, dunning automático com lembretes, carência por
+plano e suspensão sem perda de dados, provisionamento pelo MASTER, simulador de
+eventos assinados para demo e console financeiro com MRR/ARR, churn e receita
+por plano.
+
+### 🛡️ Console MASTER (`/admin/dashboard`)
+Visão global da plataforma: métricas financeiras, gestão de assinantes com
+aprovação de cadastro, impersonação, bloqueio manual, editor visual de planos
+(preços, limites, créditos, trial, carência e linhas exibidas no card público),
+ledger de eventos de webhook com replay e varredura manual de dunning.
+
+---
+
+## 🏗️ Arquitetura
+
+### Modelo multi-tenant
 
 ```
-├── docker-compose.yml              Postgres 16 + Redis 7 + Next dev + optional worker
-├── Dockerfile / Dockerfile.dev     Production (multi-stage) & development images
-├── prisma/
-│   ├── schema.prisma               Full multi-tenant schema + composite indexes
-│   ├── migrations/0_init/          Generated Phase 1 migration (Postgres SQL)
-│   ├── migrations/..._property_management_engine/   Phase 2 migration
-│   ├── migrations/..._public_portal_seo/            Phase 3 migration (slug/searchText/neighborhood)
-│   └── seed.ts                     Idempotent demo data (plans, tenants, users)
-└── src/
-    ├── middleware.ts               Edge: subdomain tenant resolution + session gate
-    ├── app/                        Routes (public portal, login/dashboard, properties, media, imports, analytics, API)
-    ├── components/
-    │   ├── portal/                 SiteHeader/Footer, PropertyCard, SearchFilters, Gallery,
-    │   │                           ListingMap (Leaflet), ContactModal, Pagination
-    │   └── LoginForm, DashboardView, SignOutButton
-    ├── lib/
-    │   ├── config/env.ts           Zod-validated environment singleton (incl. S3_*)
-    │   ├── prisma/
-    │   │   ├── client.ts           `prisma` (scoped) + `prismaUnscoped` (sanctioned)
-    │   │   └── tenant-extension.ts FAIL-CLOSED tenantId injection at the ORM
-    │   ├── public/                 Portal read-model (repository), SEO engine, types, formatting
-    │   ├── tenant/                 context (AsyncLocalStorage), resolver, cache
-    │   ├── rbac/                   action catalog + permission matrix + guards
-    │   ├── auth/                   JWT (edge-safe), bcrypt, session helpers
-    │   ├── audit/                  AuditService + typed audit actions
-    │   ├── events/                 Typed domain event bus + audit subscribers
-    │   ├── queues/                 names, job types, QueueManager, DeadLetterQueue
-    │   ├── http/                   route-wrapper (auth+rbac+tenant), error mapper
-    │   ├── properties/             property-service (duplicate/status/featured/soft-delete) + seo.ts (slug/searchText)
-    │   ├── billing/                Phase 5: state-machine, webhook ingest, dunning, highlights,
-    │   │                           metrics, plans, gateway adapters (+hmac verify), service/provision
-    │   ├── media/                  image.ts (sharp), media-service.ts (gallery/upload)
-    │   ├── storage/                S3-compatible adapter (R2/MinIO/AWS) + LocalStorage
-    │   ├── imports/                parsers.ts (CSV/XML/JSON) + import-engine.ts
-    │   ├── analytics/              dashboard.ts (status/utilization/engagement)
-    │   └── validation/             Zod contracts for request boundaries
-    ├── workers/                    BullMQ consumers (lead-routing, webhook, media, import, billing-sync, DLQ)
-    └── types/                      Cross-cutting TS types
+Tenant 1───< User          (tenantId nulo apenas para MASTER da plataforma)
+    │───< Property         @@index([tenantId, id])  @@unique([tenantId, code])
+    │───< Lead             @@index([tenantId, id])
+    │───< TenantSubscription / PaymentInvoice / HighlightCreditLedger ...
+    └───< AuditLog         @@index([tenantId, id], [tenantId, createdAt])
 ```
 
-*Recap of Phase 1: multi-tenant foundation, RBAC, queues, audit.*
-*Phase 2: Property Management Engine. Phase 3: Public Portal, Search & SEO.
-Phase 5: Billing/Subscription Engine + Master Admin (see below).*
+### Defesa em profundidade (4 camadas)
 
----
-
-## Phase 3 — Public Portal, Search & SEO
-
-An SSR public portal (ISR 60–300 s) that aggregates **ACTIVE listings from
-every ACTIVE tenant**, with URL-driven search and structured data.
-
-### 1. Schema & public identity
-
-- `Property` gained `slug` (globally unique, indexable PDP URL), `neighborhood`
-  and a denormalized `searchText` haystack. Migration:
-  `prisma/migrations/20260819010000_public_portal_seo/`.
-- `src/lib/properties/seo.ts` — `slugify`/`slugBaseFrom`/`ensureUniqueSlug`
-  (cross-tenant uniqueness probe via `prismaUnscoped`) and `buildSearchText`.
-- `property-service`, POST/PATCH routes and the import-engine regenerate
-  slug/searchText on every write; imports preserve existing slugs (stable URLs).
-
-### 2. Public read-model (`src/lib/public/repository.ts`)
-
-- **`prismaUnscoped` is mandatory here** (the portal is cross-tenant); every
-  query enforces `status = ACTIVE AND isActive = true AND tenant.status = ACTIVE`
-- `searchListings()` — multi-variable filters (city slug, target, category,
-  neighborhood, free-text `q`, price band, bedrooms/suites/baths/parking/area,
-  featured, furnished) + sort + pagination.
-- `listCities()` (city dir for landing + sitemap), `listFeatured/ListLatest`,
-  `listSimilar()`, `getPublicListing(slug)`, `resolveCitySlug()`.
-- Media rows are filtered to `IMAGE/READY` and resolved to public URLs.
-
-### 3. Routes
-
-| Route                                   | Purpose                                                    |
-| --------------------------------------- | ---------------------------------------------------------- |
-| `/`                                     | SSR landing — hero, featured, cities, latest, trust        |
-| `/imoveis`                              | All listings (query filters on the URL)                    |
-| `/imoveis/[city]/[target]/[category]`   | SEO search tiers, e.g. `/imoveis/sao-paulo-sp/venda/apartamento` |
-| `/imoveis/[slug]`                        | PDP — gallery/lightbox, specs, Leaflet map, broker card, WhatsApp + schedule modal, similar |
-| `/api/public/leads`                     | Public lead intake (cross-tenant, stamped to the property's tenant) |
-| `/sitemap.xml` `robots.txt`             | Dynamic sitemap of city hubs + every visible listing       |
-
-The portal shell (header/footer/cards) lives in `src/components/portal/`
-(Tailwind, light theme) and is 100% React AwaL server-rendered; only the
-gallery lightbox, map and contact modal are client components.
-
-### 4. SEO engine (`src/lib/public/seo.ts`)
-
-- `buildMetadata()` factory → unique title/description, canonical URL, Open
-  Graph/Twitter (page-specific).
-- Schema.org JSON-LD: `RealEstateListing` (Offer + GeoCoordinates + Place) on
-  every PDP; `BreadcrumbList` on search pages; dynamic `sitemap.xml` of all city
-  hubs + visible listing slugs.
-- Robots disallows `/dashboard`, `/api/`, `/login`.
-
-### 5. Tests (Phase 3)
-
-- `src/lib/public/repository.test.ts` — visibility contract + filter wiring.
-- `src/lib/public/seo.test.ts` — metadata + JSON-LD + BRL/area formatting.
-- `src/lib/properties/seo.test.ts` — slugify/searchText/unique-slug behaviour.
-
----
-
-## Phase 5 — Billing, Subscription Engine & Master Admin
-
-Recurring subscription/payment engine (Stripe / Asaas / custom `CUSTOM`
-gateways) with automated dunning, a highlight add-on economy and a MASTER-only
-SaaS console. All real money values are **integer cents (BRL)** — never floats.
-
-Migration: `prisma/migrations/20260820030000_billing_subscription_engine`.
-
-### 1. Schema
-
-- Enums: `BillingProvider`, `BillingCycle`, `BillingEventStatus`,
-  `PaymentInvoiceStatus`, `BillingNotificationKind`, `HighlightPurchaseStatus`,
-  `HighlightLedgerKind`, `HighlightSource`.
-- `Plan` gained billing config (`billingCycle`, `maxProperties`, `maxUsers`,
-  `maxLeads`, `highlightCredits`, `gracePeriodDays`, `trialDays`) plus the
-  `planOverrides` tenant relation.
-- New models: `TenantSubscription` (mirrors `TenantStatus`), `PaymentInvoice`,
-  `BillingNotification` (unique `[tenantId,kind,dueDate]`), `HighlightPurchase`,
-  `PropertyHighlight`, `HighlightCreditLedger` (append-only) and `BillingEvent`
-  — the idempotency ledger with `@@unique([provider, providerEventId])`.
-
-### 2. Webhook pipeline (`src/lib/billing/`)
-
-- `gateway/verify.ts` — HMAC signature verification **over the exact raw body
-  bytes** (never re-serialized); `gateway/index.ts` adapters (stripe/asaas/
-  custom) with the `stripeCents()` minor-unit fix + `amountCents` convention.
-- `billing-events.ts` — public ingress `POST /api/billing/webhooks`:
-  signature → normalize → **idempotent ledger create** (`BillingEvent` unique
-  key, duplicates acked) → dispatch to the state machine; FAILED → retryable.
-- `state-machine.ts` — single authority over the subscription lifecycle
-  (`handleCheckoutCompleted`, `handleInvoicePaid` with per-guard re-enablement
-  + plan allotment, `handlePaymentFailed`, manual `manualBlockedAt` → 409).
-- `dunning.ts` — `runGlobalBillingScan`: pre-due reminders, TRIAL→PAST_DUE at
-  `trialEndsAt`, grace-expiry auto-suspension honoring `manualBlockedAt` and
-  `BILLING_AUTOSUSPEND_ENABLED`, auto-reactivation on payment. Suspension only
-  flips status — **never deletes tenant data/media**.
-- `highlights.ts` — ledger-based credit system: plan allotment, TOPUP packs,
-  `activateHighlight` (debits balance, upserts the feature window by property,
-  priority boost), `expireDueHighlights`, purchases with `CUSTOM` checkout.
-- `metrics.ts` — Master SaaS snapshot: **MRR/ARR (cents)**, period revenue,
-  revenue-by-plan, churn rate, delinquency, highlight economics, conversion per
-  `WebhookScope` and property health.
-- `service.ts` / `plans.ts` — tenant provisioning (idempotent) + plan editor.
-  `simulateProviderEvent` drives the real signed pipeline for dev/demo.
-
-### 3. Automation
-
-- `BILLING_SYNC` queue (concurrency 1): `src/workers/billing.worker.ts` runs
-  the daily global billing scan at **02:00 America/Sao_Paulo**
-  (`QueueManager.scheduleBillingDailyScan`) + highlight expiry. Platform-level
-  jobs (no tenant context); failed → `billing-sync-dlq` with replay.
-
-### 4. RBAC & API
-
-- New permissions: `billing:self` (OWNER/MANAGER + MASTER) and `billing:admin`
-  (**MASTER-only**).
-
-| Method | Path | RBAC |
-| ------ | ---- | ---- |
-| POST   | `/api/billing/webhooks` | public (provider signature) |
-| GET    | `/api/billing/subscription` | `billing:self` |
-| GET/POST | `/api/billing/highlights` (balance / topup purchase) | `billing:self` |
-| POST   | `/api/billing/highlights/activate` | `billing:self` |
-| POST   | `/api/billing/highlights/purchases/[id]/pay` | `billing:self` |
-| GET    | `/api/admin/billing/metrics`, `.../events`, `.../scan` | `billing:admin` |
-| GET/PATCH | `/api/admin/billing/plans`, `.../plans/[code]`, `.../plans/[code]/status` | `billing:admin` |
-| GET/POST | `/api/admin/billing/tenants/[id]`, `.../provision`, `.../simulate` | `billing:admin` |
-
-### 5. UI
-
-- `/dashboard/billing` (`src/components/billing/TenantBillingPanel.tsx`) —
-  subscription status, invoices, notifications, highlight balance, activate
-  highlight on a property, buy credit packs, simulated custom-gateway pay.
-- `/admin/billing` (`src/components/admin/BillingAdminConsole.tsx`) — overview
-  (metrics cards), plan editor, tenant drill-down with provision/simulate, and
-  the webhook event ledger + manual scan trigger.
-
-### 6. Env & tests
-
-New env (see `.env.example`): `STRIPE_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY`,
-`ASAAS_WEBHOOK_SECRET`, `ASAAS_API_KEY`, `ASAAS_API_URL`,
-`CUSTOM_WEBHOOK_SECRET`, `BILLING_GRACE_DAYS`, `BILLING_PRE_DUE_NOTIFY_DAYS`,
-`BILLING_AUTOSUSPEND_ENABLED` (all optional for dev — the verify step skips
-signature checks when empty).
-
-Tests: `verify.test.ts`, `billing-adapters.test.ts`, `billing-events.test.ts`
-(idempotency), `dunning.test.ts`, `highlights.test.ts` + RBAC extensions
-(`billing:admin` MASTER-only, `billing:self` tenant-scoped). The seed builds a
-third demo tenant (`delta`, PAST_DUE) and acme's MRR/highlight economy through
-the real pipeline.
-
----
-
-## Phase 2 — Property Management Engine
-
-Four work-streams shipped on top of the Phase 1 foundation:
-
-### 1. Listing lifecycle (`/api/properties`)
-
-- Full CRUD surface with **action runner** endpoints:
-  `POST .../[id]/duplicate`, `PATCH .../[id]/status` (ACTIVE/INACTIVE/SOLD/
-  RENTED + soft-delete/restore via `isActive`), `PATCH .../[id]/featured`.
-- Enriched schema: `target` (SALE/RENT/BOTH), `category`, sale/rent/condo/Tax
-  pricing, full address + geo, specs (area, bedrooms, suites, baths, parking),
-  `isFeatured`/`isFurnished`, and `externalCode` for import dedupe.
-- `src/lib/properties/property-service.ts` — engine operations, all tenant-
-  scoped via the ambient Prisma extension.
-
-### 2. Resilient media pipeline (`/api/properties/[id]/media`, gallery, worker)
-
-- **Presigned upload** — client streams bytes directly to S3-compatible object
-  storage (`src/lib/storage/storage.ts`; works with R2/MinIO/AWS, with an
-  in-proc `LocalStorage` fallback for dev/tests).
-- **Async processing** (`media-processing-queue`) — WebP transcode + 3 variants
-  (thumbnail 400px, medium 900px, large 1400px), optional watermark composer
-  (`src/lib/media/image.ts`, `@aws-sdk/s3-request-presigner`, `sharp`).
-- **Gallery manager** — `PATCH /api/properties/[id]/gallery` (reorder + set
-  primary cover atomically), `DELETE /api/media/[mediaId]` (removes the row and
-  every stored object + variant).
-
-### 3. Batch import engine (`/api/imports`, worker)
-
-- **CSV / XML (VivaReal/ZAP-style) / JSON** parsing in pure, unit-tested
-  parsers (`src/lib/imports/parsers.ts`) with tolerant field aliasing
-  (pt-BR/common), BOM + quoted-CSV + BRL decimal handling.
-- Custom import queue (`property-import-queue`) runs the async upsert loop with
-  **per-row validation failures collected** (bounded error payload), **dedupe on
-  `externalCode` (portals) falling back to `code`**, and batch counters
-  (imported/updated/skipped/failed, status COMPLETED vs PARTIAL).
-
-### 4. Subscriber dashboard analytics (`/api/analytics/dashboard`)
-
-- `src/lib/analytics/dashboard.ts` aggregates within the active tenant:
-  - **Listing state** (ACTIVE/INACTIVE/SOLD/RENTED counts)
-  - **Plan utilization** — "45/100 properties", "2/5 user seats", "…/… leads"
-    read from the tenant's plan `features` limits
-  - **Engagement** — page views & lead counts over 7d/30d windows + conversion
-    rates (views→leads), top properties by views (leads sourced from listings)
-- Views are recorded via `POST /api/properties/[id]/view` into `PropertyView`.
-
-### New queues
-
-| Queue                        | Consumer                          | Retry policy |
-| ---------------------------- | --------------------------------- | ------------ |
-| `media-processing-queue`     | `workers/media-processing.worker.ts` | 5 × exponential; unreadable input → permanent (DLQ) |
-| `property-import-queue`      | `workers/property-import.worker.ts` | 5 × exponential; batch-level retry |
-| `lead-routing-queue`         | (Phase 1)                         | 5 × exponential |
-| `webhook-transmission-queue` | (Phase 1)                         | 5 × exponential + 4xx permanent |
-| `billing-sync-queue`         | `workers/billing.worker.ts`        | daily global dunning scan (02:00) |
-
----
-
-## Phase 1 foundation (summary)
-
----
-
-## Multi-tenancy model
-
-Every tenant-owned row carries `tenant_id`:
-
-```
-Tenant 1───< User (tenantId nullable ONLY for MASTER platform admins)
-    │───< Property     @@index([tenantId, id])  @@unique([tenantId, code])
-    │───< Lead         @@index([tenantId, id])
-    └───< AuditLog     @@index([tenantId, id], [tenantId, createdAt])
-```
-
-- Foreign keys use `ON DELETE CASCADE` (no orphan rows; tenant teardown is safe).
-- All tenant-scoped tables carry a `(tenant_id, id)` composite index, matching
-  the sharding/partitioning strategy used in later phases.
-- Tenant resolution: **subdomain → slug** (`acme.app.saas.local`), with
-  `X-Tenant-Slug` header / `?tenant=` query fallback for local development.
-
-### How isolation is enforced (defense in depth)
-
-1. **Edge middleware** (`src/middleware.ts`) resolves the subdomain, verifies the
-   session JWT, and rejects a non-MASTER user whose tenant doesn't match.
-2. **Route wrapper** (`src/lib/http/route-wrapper.ts`) re-verifies the cookie,
-   checks RBAC, resolves the tenant from cache/DB and asserts it is ACTIVE.
-3. **Prisma tenant-extension** (`src/lib/prisma/tenant-extension.ts`) injects
-   `tenant_id` into every query automatically. **Fail-closed**: a query on
-   `Property`/`Lead`/… without an ambient tenant context throws
-   `TenantContextRequiredError` before touching PostgreSQL.
-4. `runWithoutTenantScope()` is the only (explicit, audited) escape hatch for
-   infrastructure code — never used by user-facing paths.
+1. **Middleware Edge** — resolve subdomínio → tenant, valida a sessão JWT e
+   rejeita usuário cujo tenant não corresponde.
+2. **Route wrapper** (`withApiRoute`) — revalida cookie, checa RBAC, resolve o
+   tenant e garante status ativo antes de qualquer handler.
+3. **Extensão Prisma** — injeta `tenant_id` em toda query de tabelas sensíveis;
+   sem contexto de tenant, lança `TenantContextRequiredError` (**fail-closed**).
+4. **Escape hatch auditado** — `runWithoutTenantScope()` existe apenas para
+   código de infraestrutura (portal público cross-tenant, workers globais).
 
 ```ts
-// Example: NO tenantId anywhere in the handler — the extension inserts it.
-export const GET = withApiRoute(ACTIONS.PROPERTIES_READ, async (_ctx, req) => {
+// Nenhum tenantId no handler — a extensão insere automaticamente:
+export const GET = withApiRoute(ACTIONS.PROPERTIES_READ, async () => {
   const rows = await prisma.property.findMany({ where: { city: "SP" } });
-  return ok({ rows }); // scoped to the active tenant automatically
+  return ok({ rows }); // escopado ao tenant ativo
 });
 ```
 
-## RBAC
+### Filas e resiliência
 
-Five roles with a **central permission matrix** (`src/lib/rbac/matrix.ts`):
+| Fila | Consumidor | Política |
+|---|---|---|
+| `lead-routing-queue` | lead-routing worker | 5× backoff exponencial |
+| `webhook-transmission-queue` | webhook worker | 5× + 4xx → permanente |
+| `media-processing-queue` | media worker | 5×; input ilegível → DLQ |
+| `property-import-queue` | import worker | batch com falha por linha |
+| `billing-sync-queue` | billing worker | scan diário 02:00 (America/Sao_Paulo) |
 
-| Role         | Scope                      | Highlights                                          |
-| ------------ | -------------------------- | --------------------------------------------------- |
-| `MASTER`     | Platform                   | Everything incl. `tenant:change-status`             |
-| `OWNER`      | Tenant                     | All tenant actions                                  |
-| `MANAGER`    | Tenant                     | Users (no delete), properties, leads, audit read    |
-| `AGENT`      | Tenant                     | Properties read/update, leads CRUD, routing         |
-| `RECEPTIONIST` | Tenant                  | Dashboard, read properties, capture/update leads    |
-
-Guards: `hasPermission()`, `assertPermission()`, and `withApiRoute(action, …)`
-which gates the route before any handler code runs.
-
-## Queues & resilience (BullMQ)
-
-Production queues with **exponential backoff (5 attempts, 2s base)** and a **DLQ**:
-
-- `lead-routing-queue` — async lead enrichment (`src/workers/lead-routing.worker.ts`)
-- `webhook-transmission-queue` — outbound integrations with timeout + retry
-  classification (`429/5xx` retry, `4xx` permanent → DLQ immediately)
-- `media-processing-queue` — WebP/thumbnail pipeline (Phase 2)
-- `property-import-queue` — batch property imports (Phase 2)
-- `billing-sync-queue` — daily global billing/dunning scan (Phase 5)
-
-Every job carries `tenantId`; the worker opens that tenant context before any
-DB access. Failed jobs are parked in `<queue>-dlq` and can be replayed via
-`POST /api/jobs/[jobId]/replay` (audit-trailed).
-
-## Audit logging
-
-`AuditService` writes every critical event (login, property deletion, tenant
-status change, integration/job failures) to `AuditLog` with automatically
-resolved tenant/user/IP/user-agent context. Domain events
-(`src/lib/events/event-bus.ts`) decouple producers from observers — audit
-subscribers are wired once in `src/lib/events/register.ts`.
+Todo job carrega `tenantId`; falhas vão para `<queue>-dlq` com replay via
+`POST /api/jobs/[jobId]/replay`.
 
 ---
 
-## Getting started
+## 🚀 Como rodar
 
-### Option A — Docker Compose (Postgres + Redis + app)
+### Opção A — Docker Compose (recomendado)
 
 ```bash
-cp .env.example .env            # then edit JWT_SECRET
+git clone https://github.com/bonamigod86/ImobFlow.git && cd ImobFlow
+cp .env.example .env                 # defina um JWT_SECRET forte
 docker compose up -d --build
 docker compose exec app npx prisma migrate deploy
 docker compose exec app npm run db:seed
-
-# Open: http://localhost:3000
-# Login (demo): owner@acme.com / ChangeMe-123!
-# Subdomain dev (optional): add `127.0.0.1 acme.saas.local` to /etc/hosts
-#                          then login at http://acme.saas.local:3000
 ```
 
-### Option B — Local Node (no Docker)
+➡ Abra **http://localhost:3000**
+
+### Opção B — Node local (sem Docker)
 
 ```bash
 npm install
-cp .env.example .env            # point DATABASE_URL at a Postgres you own
+cp .env.example .env                 # aponte DATABASE_URL para seu Postgres
 npx prisma migrate dev
 npm run db:seed
-npm run dev                     # http://localhost:3000
-npm run worker                  # separate terminal: queue consumers
+npm run dev        # app      → http://localhost:3000
+npm run worker     # workers  → terminal separado
 ```
 
-### Verify
+### 👤 Usuários demo (após o seed)
+
+| Perfil | E-mail | Senha |
+|---|---|---|
+| MASTER (plataforma) | `admin@saas.local` | `ChangeMe-123!` |
+| OWNER (imobiliária) | `owner@acme.com` | `ChangeMe-123!` |
+
+> ⚠️ Em produção use senhas fortes e um `JWT_SECRET` exclusivo
+> (`openssl rand -hex 32`).
+
+### ✅ Verificação de qualidade
 
 ```bash
 npm run typecheck   # tsc --noEmit
-npm run test        # vitest (rbac, subdomain, jwt, tenant fail-closed)
 npm run lint        # next lint
+npm test            # vitest — 246 testes
 ```
 
-### Useful endpoints
+---
 
-| Method | Path                           | Auth / RBAC                |
-| ------ | ------------------------------ | -------------------------- |
-| POST   | `/api/auth/login`              | public                     |
-| GET    | `/api/health`                  | public (db+redis probes)   |
-| GET/POST | `/api/properties`            | `properties:read`/`create` |
-| GET/PATCH/DELETE | `/api/properties/[id]`  | read / update / delete     |
-| POST   | `/api/properties/[id]/duplicate` | `properties:create`    |
-| PATCH  | `/api/properties/[id]/status`  | `properties:update`        |
-| PATCH  | `/api/properties/[id]/featured`| `properties:update`        |
-| POST   | `/api/properties/[id]/view`    | `properties:read` (records view) |
-| POST   | `/api/properties/[id]/media`   | `properties:update` (presigned upload) |
-| PATCH  | `/api/properties/[id]/gallery` | `properties:update` (reorder/primary) |
-| DELETE | `/api/media/[mediaId]`         | `properties:update`        |
-| POST   | `/api/imports?format=csv`      | `properties:create` (queues import job) |
-| GET    | `/api/imports` / `/api/imports/[id]` | `properties:read`   |
-| GET    | `/api/analytics/dashboard`     | `dashboard:read`           |
-| GET/POST | `/api/leads`               | `leads:read`/`create` (+queues lead-routing job) |
-| POST   | `/api/jobs/[jobId]`            | `leads:read` (tenant-scoped) |
-| POST   | `/api/jobs/[jobId]/replay`     | `integrations:manage`      |
-| PATCH  | `/api/admin/tenants/[id]`      | `tenant:change-status` (MASTER) |
-| POST   | `/api/public/leads`            | public (portal lead intake, routed to listing's tenant) |
-| POST   | `/api/billing/webhooks`        | public (provider signature → idempotent ingest) |
-| GET    | `/api/billing/subscription`    | `billing:self` |
-| GET/POST | `/api/billing/highlights`    | `billing:self` (balance / topup purchase) |
-| POST   | `/api/billing/highlights/activate` | `billing:self` |
-| POST   | `/api/billing/highlights/purchases/[id]/pay` | `billing:self` |
-| GET    | `/api/admin/billing/metrics`, `.../scan`, `.../events` | `billing:admin` (MASTER) |
-| GET/PATCH | `/api/admin/billing/plans`, `.../plans/[code]` | `billing:admin` |
-| GET/POST | `/api/admin/billing/tenants/[id]`, `.../provision`, `.../simulate` | `billing:admin` |
+## ⚙️ Variáveis de ambiente
+
+Copie `.env.example` → `.env`. As principais:
+
+| Variável | Descrição |
+|---|---|
+| `DATABASE_URL` | Connection string PostgreSQL (Prisma) |
+| `REDIS_URL` | Connection string Redis (cache + BullMQ) |
+| `JWT_SECRET` | Segredo HS256 das sessões (≥ 32 caracteres) |
+| `APP_DOMAIN` | Domínio raiz p/ resolução de tenants por subdomínio |
+| `APP_URL` | URL pública base da aplicação |
+| `S3_*` | Object storage de mídias (vazio = fallback local dev) |
+| `STRIPE_*` / `ASAAS_*` / `CUSTOM_WEBHOOK_SECRET` | Billing (opcional em dev) |
+| `EMAIL_PROVIDER` | `console` \| `resend` \| `sendgrid` \| `ses` |
+| `BILLING_GRACE_DAYS` | Carência padrão quando o plano não define |
+
+Lista completa comentada em [`.env.example`](.env.example).
 
 ---
 
-## Public portal demo
+## ☁️ Deploy
 
-```bash
-npm run db:seed        # adds neighborhood/slug/searchText to demo listings
-npm run dev
-# Open http://localhost:3000            → landing
-#      http://localhost:3000/imoveis    → all listings
-#      http://localhost:3000/imoveis/sao-paulo-sp/venda/apartamento
-#      PDP: click any card
-```
-
-`NEXT_PUBLIC_SITE_URL` (defaults to `https://imob.example.com`) drives
-canonical URLs, sitemap, and JSON-LD. Public media needs `S3_PUBLIC_BASE_URL`
-(or a CDN) and `next/image` remote patterns for `next/image` to optimize
-portal galleries (see `next.config.mjs`).
+Guia completo em **[DEPLOY.md](DEPLOY.md)** — inclui opções gratuitas
+(MonkeysCloud, Vercel + Neon + Upstash), deploy no VPS Hostinger com Docker
+Compose + Nginx/TLS, restore de banco e checklist pós-deploy.
 
 ---
 
-## Security checklist (as implemented)
+## 🔌 API (principais rotas)
 
-- [x] Tenant isolation enforced at ORM, route, and middleware layers (fail-closed)
-- [x] HttpOnly + SameSite cookies; short-lived signed JWTs (HS256, `JWT_SECRET`
-      validated ≥ 32 chars at startup)
-- [x] bcrypt (cost 12, 72-byte bound) password hashing
-- [x] RBAC matrix with role-scoped guards on every protected route
-- [x] Tenant status gate (BLOCKED/CANCELLED rejected on each request)
-- [x] Audit trail for privileged/security events with request context
-- [x] Retry/backoff/DLQ for async jobs; idempotency via stable job IDs
-- [x] Zod validation on every request boundary; no secrets in API responses
-- [x] Production image runs as non-root user; Docker health checks wired
+<details>
+<summary><strong>Expandir tabela de endpoints</strong></summary>
 
-## Next phases (roadmap)
+| Método | Rota | Acesso |
+|---|---|---|
+| POST | `/api/auth/login` · `/api/auth/logout` · `/api/auth/forgot-password` · `/api/auth/reset-password` | público / sessão |
+| GET | `/api/health` | público (probes db+redis) |
+| GET/POST | `/api/properties` | `properties:read` / `properties:create` |
+| GET/PATCH/DELETE | `/api/properties/[id]` | leitura / atualização / soft-delete |
+| POST | `/api/properties/[id]/duplicate` · `/status` · `/featured` · `/view` | `properties:*` |
+| POST/PATCH | `/api/properties/[id]/media` · `/gallery` | upload presignado / galeria |
+| DELETE | `/api/media/[mediaId]` | remove objeto + variantes |
+| POST | `/api/imports?format=csv\|xml\|json` | importação em lote (fila) |
+| GET | `/api/analytics/dashboard` | `dashboard:read` |
+| GET/POST | `/api/leads` (+ `/[id]`, privacy) | `leads:*` |
+| POST | `/api/public/leads` · `/api/public/listings` · `/api/public/views` | público (portal) |
+| POST | `/api/register` | cria conta pendente de aprovação |
+| POST | `/api/billing/webhooks` | público (assinatura HMAC → ledger idempotente) |
+| GET | `/api/billing/plans` · `/subscription` · `/highlights` | `billing:self` |
+| POST | `/api/billing/highlights/activate` · `/subscribe` | `billing:self` |
+| GET/PATCH | `/api/admin/billing/plans[/code][/status]` | `billing:admin` (MASTER) |
+| GET | `/api/admin/billing/metrics` · `/events` · `/scan` | `billing:admin` |
+| PATCH/POST | `/api/admin/tenants/[id][/approve\|impersonate\|payment-link]` | `tenant:*` (MASTER) |
+| POST | `/api/jobs/[jobId]/replay` | `integrations:manage` |
 
-Phase 4 proposal already shipped as **Phase 5: billing/subscription engine,
-tenant onboarding, dunning, highlight monetization and the Master admin
-console**. Remaining roadmap: user management CRUD, integrations gateway
-(CRMs, portals), scheduled PropertyPattern trend rollups, horizontal sharding
-per tenant + event sourcing for audit.
+</details>
 
 ---
 
-## Phase 3 changelog
+## 🔐 Segurança (checklist implementado)
 
-- Migration `20260819010000_public_portal_seo` — adds `neighborhood`, `slug`
-  (unique index), `searchText`, city/neighborhood/searchText indexes + a
-  Portuguese GIN `to_tsvector` index; backfills slugs for legacy rows.
-- Dependencies added: `tailwindcss@^3.4.17`, `autoprefixer`, `postcss`,
-  `lucide-react`, `@radix-ui/react-dialog`, `leaflet` + `@types/leaflet`.
-  (`react-leaflet` intentionally omitted — v5 requires React 19; the portal
-  uses plain Leaflet in a client component.)#   I m o b F l o w  
- 
+- [x] Isolamento de tenant em ORM + rotas + middleware (fail-closed)
+- [x] Cookies HttpOnly/SameSite; JWT curto assinado HS256 (segredo ≥ 32 chars validado no boot)
+- [x] bcrypt custo 12 com limite de 72 bytes
+- [x] RBAC central com guards em todas as rotas protegidas
+- [x] Gate de status do tenant (BLOCKED/CANCELLED rejeitado a cada request)
+- [x] Auditoria de eventos privilegiados com contexto request/user/IP
+- [x] Retry/backoff/DLQ + idempotência estável em jobs e webhooks
+- [x] Validação Zod em toda fronteira; nenhum segredo em respostas da API
+- [x] Headers de segurança (CSP, HSTS, X-Frame-Options…) via `next.config.mjs`
+- [x] Imagem de produção non-root + health checks no Docker
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] Gateway de integrações (portais imobiliários, CRMs)
+- [ ] Rollups agendados de tendências (`PropertyPattern`)
+- [ ] Sharding horizontal por tenant + event sourcing na auditoria
+- [ ] Pagamentos self-service (checkout hosted Stripe/Asaas)
+
+---
+
+<div align="center">
+
+Feito com ❤️ e muito café — **imobFlow**
+
+</div>
