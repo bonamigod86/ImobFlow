@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BadgeCheck, Check, Loader2, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { normalizeCardShow, type PlanCardShow } from "@/lib/billing/types";
 
 interface PlanRow {
   id: string;
@@ -17,6 +18,7 @@ interface PlanRow {
   highlightCredits: number;
   gracePeriodDays: number;
   trialDays: number;
+  cardShow?: PlanCardShow;
 }
 
 interface PlansData {
@@ -87,13 +89,16 @@ export default function PlanCards() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {data.plans.map((plan) => {
           const isCurrent = plan.id === data.currentPlanId;
+          const show = normalizeCardShow(plan.cardShow);
           return (
             <div
               key={plan.code}
-              className={`flex flex-col rounded-2xl border bg-white p-5 shadow-sm ${
+              className={`relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-shadow hover:shadow-md ${
                 isCurrent ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200/80"
               }`}
             >
+              <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-600 to-slate-900" />
+              <div className="flex flex-1 flex-col p-5 pt-6">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-base font-bold text-slate-900">{plan.name}</h3>
                 {isCurrent && (
@@ -111,11 +116,12 @@ export default function PlanCards() {
                 )}
               </div>
 
-              <ul className="mt-4 space-y-1.5 text-sm text-slate-600">
-                <Feature text={limitText(plan.maxProperties, "imóveis")} />
-                <Feature text={limitText(plan.maxUsers, "usuários")} />
-                <Feature text={limitText(plan.maxLeads, "leads/mês")} />
-                <Feature text={`${plan.highlightCredits} créditos de destaque/mês`} />
+              <ul className="mt-4 flex-1 space-y-1.5 text-sm text-slate-600">
+                {show.properties && <Feature text={limitText(plan.maxProperties, "imóveis")} />}
+                {show.users && <Feature text={limitText(plan.maxUsers, "usuários")} />}
+                {show.leads && <Feature text={limitText(plan.maxLeads, "leads/mês")} />}
+                {show.highlightCredits && <Feature text={`${plan.highlightCredits} créditos de destaque/mês`} />}
+                {show.trialDays && plan.trialDays > 0 && <Feature text={`${plan.trialDays} dias de trial`} />}
               </ul>
 
               <div className="mt-auto pt-4">
@@ -128,6 +134,7 @@ export default function PlanCards() {
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                   {isCurrent ? "Plano atual" : "Escolher este plano"}
                 </button>
+              </div>
               </div>
             </div>
           );

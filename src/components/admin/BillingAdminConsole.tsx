@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { UserRole } from "@prisma/client";
+import { normalizeCardShow, type PlanCardShow } from "@/lib/billing/types";
 
 /**
  * Master Admin — SaaS billing console.
@@ -53,6 +54,7 @@ interface PlanRow {
   gracePeriodDays: number;
   trialDays: number;
   isActive: boolean;
+  cardShow?: PlanCardShow;
 }
 
 interface TenantRow {
@@ -566,6 +568,7 @@ export default function BillingAdminConsole({ user }: { user: { name: string; em
                 <th>Créditos destaque</th>
                 <th>Carência (dias)</th>
                 <th>Trial (dias)</th>
+                <th title="Linhas exibidas no card público de planos">Card: exibir</th>
                 <th>Ativo</th>
                 <th></th>
               </tr>
@@ -822,6 +825,9 @@ function PlanEditor({
   useEffect(() => setDraft(plan), [plan]);
 
   const set = <K extends keyof PlanRow>(key: K, value: PlanRow[K]) => setDraft((d) => ({ ...d, [key]: value }));
+  const cardShow = normalizeCardShow(draft.cardShow);
+  const setCardShow = (key: keyof PlanCardShow, value: boolean) =>
+    setDraft((d) => ({ ...d, cardShow: { ...normalizeCardShow(d.cardShow), [key]: value } }));
   const tracked: Array<keyof PlanRow> = [
     "name",
     "priceCents",
@@ -833,7 +839,9 @@ function PlanEditor({
     "gracePeriodDays",
     "trialDays",
   ];
-  const dirty = tracked.some((k) => draft[k] !== plan[k]);
+  const dirty =
+    tracked.some((k) => draft[k] !== plan[k]) ||
+    JSON.stringify(normalizeCardShow(draft.cardShow)) !== JSON.stringify(normalizeCardShow(plan.cardShow));
 
   return (
     <tr>
@@ -892,6 +900,26 @@ function PlanEditor({
           style={{ width: "5rem" }}
         />
       </td>
+      <td title="Linhas exibidas no card público de planos">
+        <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "0.15rem 0.5rem", fontSize: "0.8rem" }}>
+          {([
+            ["properties", "Imóveis"],
+            ["users", "Usuários"],
+            ["leads", "Leads"],
+            ["highlightCredits", "Créditos"],
+            ["trialDays", "Trial"],
+          ] as Array<[keyof PlanCardShow, string]>).map(([key, label]) => (
+            <label key={key} style={{ display: "flex", alignItems: "center", gap: "0.25rem", whiteSpace: "nowrap" }}>
+              <input
+                type="checkbox"
+                checked={cardShow[key]}
+                onChange={(e) => setCardShow(key, e.target.checked)}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </td>
       <td>
         <span className={`badge ${draft.isActive ? "status-ok" : ""}`}>{draft.isActive ? "Ativo" : "Inativo"}</span>
       </td>
@@ -907,6 +935,7 @@ function PlanEditor({
             highlightCredits: draft.highlightCredits,
             gracePeriodDays: draft.gracePeriodDays,
             trialDays: draft.trialDays,
+            cardShow: normalizeCardShow(draft.cardShow),
           })} disabled={busy || !dirty}>
             Salvar
           </button>

@@ -376,6 +376,17 @@ export type TenantProfilePatchInput = z.infer<typeof tenantProfilePatchSchema>;
  * Plan catalogue contract (checklist item 12) — shared by the MASTER admin
  * create/edit endpoints so a new plan is pure configuration.
  */
+export const planCardShowSchema = z
+  .object({
+    properties: z.boolean(),
+    users: z.boolean(),
+    leads: z.boolean(),
+    highlightCredits: z.boolean(),
+    trialDays: z.boolean(),
+  })
+  .partial()
+  .strict();
+
 export const planFieldsSchema = z.object({
   name: z.string().trim().min(1, "name é obrigatório.").max(120),
   description: z.string().trim().max(400).nullable().optional(),
@@ -388,6 +399,8 @@ export const planFieldsSchema = z.object({
   gracePeriodDays: z.number().int().min(0).max(365).default(5),
   trialDays: z.number().int().min(0).max(365).default(14),
   isActive: z.boolean().default(true),
+  /** Public pricing-card row visibility (stored in the features JSON blob). */
+  cardShow: planCardShowSchema.optional(),
 });
 export type PlanFieldsInput = z.infer<typeof planFieldsSchema>;
 

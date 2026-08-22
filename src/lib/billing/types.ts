@@ -79,6 +79,36 @@ export interface BillingEventOutcome {
   action?: string;
 }
 
+/** Which benefit rows a plan shows on public pricing cards (MASTER-controlled). */
+export interface PlanCardShow {
+  properties: boolean;
+  users: boolean;
+  leads: boolean;
+  highlightCredits: boolean;
+  trialDays: boolean;
+}
+
+export const PLAN_CARD_SHOW_DEFAULT: PlanCardShow = {
+  properties: true,
+  users: true,
+  leads: true,
+  highlightCredits: true,
+  trialDays: true,
+};
+
+/** Fill missing/legacy cardShow entries with the default (all visible). */
+export function normalizeCardShow(raw: unknown): PlanCardShow {
+  const input = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const flag = (value: unknown): boolean => value !== false;
+  return {
+    properties: flag(input.properties),
+    users: flag(input.users),
+    leads: flag(input.leads),
+    highlightCredits: flag(input.highlightCredits),
+    trialDays: flag(input.trialDays),
+  };
+}
+
 /** A plan definition as seen by the Master Admin console. */
 export interface PlanDefinition {
   code: string;
@@ -93,6 +123,8 @@ export interface PlanDefinition {
   gracePeriodDays: number;
   trialDays: number;
   isActive: boolean;
+  /** Public pricing-card row visibility (persisted inside `features` JSON). */
+  cardShow?: Partial<PlanCardShow>;
 }
 
 /** Cents <-> BRL helpers used across billing boundaries. */

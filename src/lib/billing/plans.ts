@@ -1,7 +1,8 @@
 import type { BillingCycle, Plan, Prisma } from "@prisma/client";
 import { prismaUnscoped } from "@/lib/prisma/client";
 import { AppError } from "@/lib/http/errors";
-import type { PlanDefinition } from "@/lib/billing/types";
+import type { PlanCardShow, PlanDefinition } from "@/lib/billing/types";
+import { normalizeCardShow } from "@/lib/billing/types";
 import "../events/register";
 
 /**
@@ -24,6 +25,7 @@ export type PlanCreateInput = Omit<
 };
 
 function toDefinition(plan: Plan): PlanDefinition {
+  const features = (plan.features as Record<string, unknown>) ?? {};
   return {
     code: plan.code,
     name: plan.name,
@@ -37,6 +39,7 @@ function toDefinition(plan: Plan): PlanDefinition {
     gracePeriodDays: plan.gracePeriodDays,
     trialDays: plan.trialDays,
     isActive: plan.isActive,
+    cardShow: normalizeCardShow(features.cardShow),
   };
 }
 
@@ -89,6 +92,8 @@ export async function createPlan(input: PlanCreateInput): Promise<PlanDefinition
   if (input.maxProperties !== undefined) features.maxProperties = input.maxProperties;
   if (input.maxUsers !== undefined) features.maxUsers = input.maxUsers;
   if (input.maxLeads !== undefined) features.maxLeads = input.maxLeads;
+  const cardShow: PlanCardShow = normalizeCardShow(input.cardShow ?? {});
+  features.cardShow = cardShow;
 
   const plan = await prismaUnscoped.plan.create({
     data: {
@@ -122,7 +127,12 @@ export async function updatePlanFromDefinition(
 
   assertPlanScalars(input);
 
-  const features: Record<string, unknown> = (plan.features as Record<string, unknown>) ?? {};
+  const features: Record<string, unknown> = { ...((plan.features as Record<string, unknown>) ?? {}) };
+  if (input.maxProperties !== undefined) features.maxProperties = input.maxProperties;
+  if (input.maxUsers !== undefined) features.maxUsers = input.maxUsers;
+  if (input.maxLeads !== undefined) features.maxLeads = input.maxLeads;
+  if (input.cardShow !== undefined) features.cardShow = normalizeCardShow(input.cardShow);
+
   const updated = await prismaUnscoped.plan.update({
     where: { code },
     data: {
@@ -137,12 +147,7 @@ export async function updatePlanFromDefinition(
       gracePeriodDays: input.gracePeriodDays ?? plan.gracePeriodDays,
       trialDays: input.trialDays ?? plan.trialDays,
       isActive: input.isActive ?? plan.isActive,
-      features: {
-        ...features,
-        ...(input.maxProperties !== undefined ? { maxProperties: input.maxProperties } : {}),
-        ...(input.maxUsers !== undefined ? { maxUsers: input.maxUsers } : {}),
-        ...(input.maxLeads !== undefined ? { maxLeads: input.maxLeads } : {}),
-      },
+      features: features as Prisma.InputJsonValue,
     },
   });
 

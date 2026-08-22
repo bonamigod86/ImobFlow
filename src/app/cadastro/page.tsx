@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/portal/SiteHeader";
 import { SiteFooter } from "@/components/portal/SiteFooter";
 import { prismaUnscoped } from "@/lib/prisma/client";
 import { formatCentsBRL } from "@/lib/money";
+import { normalizeCardShow, type PlanCardShow } from "@/lib/billing/types";
 
 export const metadata: Metadata = {
   title: "Cadastro de imobiliárias e corretores | imobFlow",
@@ -31,8 +32,20 @@ export default async function CadastroPage() {
   const plans = await prismaUnscoped.plan.findMany({
     where: { isActive: true },
     orderBy: { priceCents: "asc" },
-    select: { name: true, description: true, priceCents: true, billingCycle: true, maxProperties: true, maxUsers: true, maxLeads: true, highlightCredits: true, trialDays: true },
+    select: {
+      name: true,
+      description: true,
+      priceCents: true,
+      billingCycle: true,
+      maxProperties: true,
+      maxUsers: true,
+      maxLeads: true,
+      highlightCredits: true,
+      trialDays: true,
+      features: true,
+    },
   });
+  const featuredIndex = plans.length > 2 ? Math.floor(plans.length / 2) : -1;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -83,34 +96,63 @@ export default async function CadastroPage() {
             Escolha o plano ideal e troque quando quiser — definidos pela plataforma e sem burocracia.
           </p>
         </div>
-        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {plans.map((plan) => (
-            <div key={plan.name} className="flex flex-col rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
-              {plan.description && <p className="mt-1 text-sm text-slate-500">{plan.description}</p>}
-              <div className="mt-4 flex items-baseline gap-1">
-                <span className="text-3xl font-extrabold text-slate-900">
-                  {plan.priceCents > 0 ? formatCentsBRL(plan.priceCents) : "Grátis"}
-                </span>
-                {plan.priceCents > 0 && (
-                  <span className="text-sm text-slate-500">/{plan.billingCycle === "YEARLY" ? "ano" : "mês"}</span>
-                )}
-              </div>
-              <ul className="mt-5 space-y-2 text-sm text-slate-600">
-                <Benefit text={plan.maxProperties === null ? "Imóveis ilimitados" : `Até ${plan.maxProperties} imóveis`} />
-                <Benefit text={plan.maxUsers === null ? "Usuários ilimitados" : `Até ${plan.maxUsers} usuários`} />
-                <Benefit text={plan.maxLeads === null ? "Leads ilimitados" : `Até ${plan.maxLeads} leads/mês`} />
-                <Benefit text={`${plan.highlightCredits} créditos de destaque/mês`} />
-                <Benefit text={`${plan.trialDays} dias de trial`} />
-              </ul>
-              <Link
-                href="/register"
-                className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:items-stretch">
+          {plans.map((plan, index) => {
+            const show = normalizeCardShow((plan.features as Record<string, unknown> | null)?.cardShow);
+            const featured = index === featuredIndex;
+            const benefits = planBenefits(plan, show);
+            return (
+              <div
+                key={plan.name}
+                className={`relative flex flex-col overflow-hidden rounded-2xl shadow-sm transition-shadow hover:shadow-lg ${
+                  featured
+                    ? "bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 text-white ring-2 ring-emerald-400/60 lg:-my-3"
+                    : "border border-slate-200/80 bg-white"
+                }`}
               >
-                Começar com {plan.name}
-              </Link>
-            </div>
-          ))}
+                {!featured && (
+                  <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-600 to-slate-900" />
+                )}
+                {featured && (
+                  <span className="absolute right-4 top-4 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-emerald-50 backdrop-blur-sm">
+                    Mais popular
+                  </span>
+                )}
+                <div className={featured ? "flex flex-1 flex-col p-6 pt-8" : "flex flex-1 flex-col p-6"}>
+                  <h3 className={`text-lg font-bold ${featured ? "text-white" : "text-slate-900"}`}>{plan.name}</h3>
+                  {plan.description && (
+                    <p className={`mt-1 text-sm ${featured ? "text-emerald-50/80" : "text-slate-500"}`}>{plan.description}</p>
+                  )}
+                  <div className="mt-4 flex items-baseline gap-1">
+                    <span className={`text-4xl font-extrabold tracking-tight ${featured ? "text-white" : "text-slate-900"}`}>
+                      {plan.priceCents > 0 ? formatCentsBRL(plan.priceCents) : "Grátis"}
+                    </span>
+                    {plan.priceCents > 0 && (
+                      <span className={`text-sm font-medium ${featured ? "text-emerald-100/80" : "text-slate-500"}`}>
+                        /{plan.billingCycle === "YEARLY" ? "ano" : "mês"}
+                      </span>
+                    )}
+                  </div>
+                  <ul className={`mt-6 flex-1 space-y-2.5 text-sm ${featured ? "text-emerald-50" : "text-slate-600"}`}>
+                    {benefits.map((text) => (
+                      <Benefit key={text} text={text} featured={featured} />
+                    ))}
+                  </ul>
+                  <Link
+                    href="/register"
+                    className={`mt-7 inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-colors ${
+                      featured
+                        ? "bg-white text-emerald-700 shadow-lg hover:bg-emerald-50"
+                        : "bg-emerald-600 text-white hover:bg-emerald-700"
+                    }`}
+                  >
+                    Começar com {plan.name}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -180,10 +222,30 @@ export default async function CadastroPage() {
   );
 }
 
-function Benefit({ text }: { text: string }) {
+interface PlanCardPlan {
+  maxProperties: number | null;
+  maxUsers: number | null;
+  maxLeads: number | null;
+  highlightCredits: number;
+  trialDays: number;
+}
+
+/** Benefit rows for a pricing card, honoring the MASTER cardShow toggles. */
+function planBenefits(plan: PlanCardPlan, show: PlanCardShow): string[] {
+  const rows: Array<[boolean, string]> = [
+    [show.properties, plan.maxProperties === null ? "Imóveis ilimitados" : `Até ${plan.maxProperties} imóveis`],
+    [show.users, plan.maxUsers === null ? "Usuários ilimitados" : `Até ${plan.maxUsers} usuários`],
+    [show.leads, plan.maxLeads === null ? "Leads ilimitados" : `Até ${plan.maxLeads} leads/mês`],
+    [show.highlightCredits, `${plan.highlightCredits} créditos de destaque/mês`],
+    [show.trialDays, `${plan.trialDays} dias de trial`],
+  ];
+  return rows.filter(([visible]) => visible).map(([, text]) => text);
+}
+
+function Benefit({ text, featured = false }: { text: string; featured?: boolean }) {
   return (
     <li className="flex items-center gap-2">
-      <BadgeCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+      <BadgeCheck className={`h-4 w-4 shrink-0 ${featured ? "text-emerald-200" : "text-emerald-600"}`} />
       {text}
     </li>
   );

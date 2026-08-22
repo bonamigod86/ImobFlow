@@ -3,6 +3,7 @@ import { ACTIONS } from "@/lib/rbac/actions";
 import { withApiRoute } from "@/lib/http/route-wrapper";
 import { ok } from "@/lib/http/errors";
 import { prismaUnscoped } from "@/lib/prisma/client";
+import { normalizeCardShow } from "@/lib/billing/types";
 
 /**
  * GET /api/billing/plans  (tenant — BILLING_SELF)
@@ -27,6 +28,7 @@ export const GET = withApiRoute(ACTIONS.BILLING_SELF, async (ctx) => {
         highlightCredits: true,
         gracePeriodDays: true,
         trialDays: true,
+        features: true,
       },
     }),
     ctx.tenantId
@@ -41,7 +43,11 @@ export const GET = withApiRoute(ACTIONS.BILLING_SELF, async (ctx) => {
   ]);
 
   return ok({
-    plans,
+    plans: plans.map((plan) => ({
+      ...plan,
+      features: undefined,
+      cardShow: normalizeCardShow((plan.features as Record<string, unknown> | null)?.cardShow),
+    })),
     currentPlanId: tenant?.subscription?.planId ?? tenant?.planId ?? null,
     subscription: tenant?.subscription ?? null,
   });
